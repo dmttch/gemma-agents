@@ -1,3 +1,5 @@
-"""Gemma Agents local runtime, version 4."""
+"""Gemma Agents: a local development agent with explicit execution boundaries."""
 
-__version__ = "0.4.0"
+from importlib.metadata import version
+
+__version__ = version("gemma-agents")

@@ -308,7 +308,9 @@ def test_plain_cli_chat_and_commands(settings, monkeypatch):
     result = CliRunner().invoke(main, ["--plain"],
                                 input="/help\nBonjour\n/plan\n/quit\n")
     assert result.exit_code == 0, result.output
-    assert "V4" in result.output and "Bonjour" in result.output
+    from gemma_agents import __version__
+
+    assert __version__ in result.output and "Bonjour" in result.output
     assert "completed" in result.output
     assert "reprise" in result.output
 

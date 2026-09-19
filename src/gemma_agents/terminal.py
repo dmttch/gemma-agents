@@ -22,6 +22,7 @@ from rich.syntax import Syntax
 from rich.table import Table
 from rich.text import Text
 
+from gemma_agents import __version__
 from gemma_agents.checkpoints import Checkpoints
 from gemma_agents.presentation import safe_text, tool_content
 from gemma_agents.tasks import Planner
@@ -310,7 +311,7 @@ class TerminalChat:
         settings = self.runtime.settings
         model = self.runtime.sessions.model(self.session) or settings.model
         self.console.print(Panel(Group(
-            Text("GEMMA AGENTS  /  V4", style="bold cyan"),
+            Text(f"GEMMA AGENTS  /  {__version__}", style="bold cyan"),
             Text(f"{model}  ·  {settings.workspace}", style="dim"),
             Text("Décris une tâche, colle du code ou tape / pour les commandes."),
         ), border_style="cyan", padding=(1, 2)))

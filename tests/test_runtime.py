@@ -2,6 +2,7 @@
 
 import json
 import sqlite3
+from contextlib import closing
 from dataclasses import replace
 
 import pytest
@@ -50,7 +51,7 @@ def test_v1_database_migration_is_additive(tmp_path):
     """Preserve legacy messages while adding schema and enforcing workspace ownership.
     """
     path = tmp_path / "agent.db"
-    with sqlite3.connect(path) as db:
+    with closing(sqlite3.connect(path)) as db, db:
         db.executescript("""
             CREATE TABLE sessions(id TEXT PRIMARY KEY, workspace TEXT NOT NULL,
                                   created_at TEXT NOT NULL);

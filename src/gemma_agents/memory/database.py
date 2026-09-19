@@ -22,79 +22,10 @@ class Database:
         """
         self.path = path
         path.parent.mkdir(parents=True, exist_ok=True)
-        with self.connect() as db:
-            db.executescript("""
-                PRAGMA journal_mode=WAL;
-                CREATE TABLE IF NOT EXISTS sessions (
-                    id TEXT PRIMARY KEY, workspace TEXT NOT NULL,
-                    created_at TEXT NOT NULL);
-                CREATE TABLE IF NOT EXISTS messages (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    session_id TEXT NOT NULL REFERENCES sessions(id),
-                    created_at TEXT NOT NULL, payload TEXT NOT NULL);
-                CREATE INDEX IF NOT EXISTS idx_messages_session
-                    ON messages(session_id, id);
-                CREATE TABLE IF NOT EXISTS memories (
-                    id TEXT PRIMARY KEY, workspace TEXT NOT NULL,
-                    content TEXT NOT NULL, model TEXT NOT NULL,
-                    embedding TEXT NOT NULL, created_at TEXT NOT NULL);
-                CREATE TABLE IF NOT EXISTS plans (
-                    session_id TEXT PRIMARY KEY REFERENCES sessions(id),
-                    payload TEXT NOT NULL);
-                CREATE TABLE IF NOT EXISTS tasks (
-                    id TEXT PRIMARY KEY, workspace TEXT NOT NULL,
-                    prompt TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending',
-                    session_id TEXT REFERENCES sessions(id), result TEXT,
-                    created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
-                CREATE TABLE IF NOT EXISTS schedules (
-                    id TEXT PRIMARY KEY, workspace TEXT NOT NULL,
-                    prompt TEXT NOT NULL, cron TEXT NOT NULL, timezone TEXT NOT NULL,
-                    next_run TEXT NOT NULL, enabled INTEGER NOT NULL DEFAULT 1);
-                CREATE TABLE IF NOT EXISTS audit (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    session_id TEXT NOT NULL REFERENCES sessions(id),
-                    tool TEXT NOT NULL, arguments TEXT NOT NULL,
-                    outcome TEXT NOT NULL, detail TEXT NOT NULL,
-                    created_at TEXT NOT NULL);
-                CREATE TABLE IF NOT EXISTS checkpoints (
-                    session_id TEXT PRIMARY KEY REFERENCES sessions(id),
-                    payload TEXT NOT NULL, updated_at TEXT NOT NULL);
-                CREATE TABLE IF NOT EXISTS context_notes (
-                    session_id TEXT PRIMARY KEY REFERENCES sessions(id),
-                    content TEXT NOT NULL, updated_at TEXT NOT NULL);
-                CREATE TABLE IF NOT EXISTS runs (
-                    id TEXT PRIMARY KEY,
-                    session_id TEXT NOT NULL REFERENCES sessions(id),
-                    status TEXT NOT NULL, started_at TEXT NOT NULL,
-                    finished_at TEXT, detail TEXT NOT NULL DEFAULT '');
-                CREATE TABLE IF NOT EXISTS edits (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    session_id TEXT NOT NULL REFERENCES sessions(id),
-                    path TEXT NOT NULL, before_text TEXT, after_text TEXT NOT NULL,
-                    status TEXT NOT NULL, created_at TEXT NOT NULL);
-                CREATE TABLE IF NOT EXISTS task_checks (
-                    task_id TEXT PRIMARY KEY REFERENCES tasks(id),
-                    commands TEXT NOT NULL);
-                CREATE TABLE IF NOT EXISTS verifications (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    session_id TEXT NOT NULL REFERENCES sessions(id),
-                    command TEXT NOT NULL, status TEXT NOT NULL,
-                    output TEXT NOT NULL, created_at TEXT NOT NULL);
-                CREATE TABLE IF NOT EXISTS session_details (
-                    session_id TEXT PRIMARY KEY REFERENCES sessions(id),
-                    title TEXT NOT NULL DEFAULT '', model TEXT NOT NULL DEFAULT '');
-                CREATE TABLE IF NOT EXISTS command_grants (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT, workspace TEXT NOT NULL,
-                    scope TEXT NOT NULL, scope_id TEXT NOT NULL,
-                    command TEXT NOT NULL, expires_at TEXT NOT NULL);
-                CREATE TABLE IF NOT EXISTS verification_states (
-                    verification_id INTEGER PRIMARY KEY REFERENCES verifications(id),
-                    before_hash TEXT, after_hash TEXT);
-                CREATE TABLE IF NOT EXISTS task_sources (
-                    task_id TEXT PRIMARY KEY REFERENCES tasks(id),
-                    schedule_id TEXT NOT NULL REFERENCES schedules(id));
-                PRAGMA user_version=4;
-            """)
+        from gemma_agents.memory.migrations import migrate
+
+        migrate(path)
+        path.chmod(0o600)
 
     @contextmanager
     def connect(self):

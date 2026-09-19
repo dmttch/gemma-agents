@@ -16,6 +16,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
+from gemma_agents import __version__
 from gemma_agents.runtime import Runtime, RuntimeBusyError
 from gemma_agents.security.approvals import ApprovalBroker, RemoteApprover
 
@@ -86,7 +87,7 @@ def create_app(runtime: Runtime, *, scheduler: bool = False) -> FastAPI:
             authorization.encode(), ("Bearer " + token).encode(),
         )
 
-    app = FastAPI(title="Gemma Agents V4", lifespan=lifespan,
+    app = FastAPI(title="Gemma Agents", version=__version__, lifespan=lifespan,
                   docs_url=None, redoc_url=None, openapi_url=None)
 
     @app.middleware("http")
@@ -119,7 +120,7 @@ def create_app(runtime: Runtime, *, scheduler: bool = False) -> FastAPI:
     @app.get("/health")
     def health():
         """Report the runtime version and sandbox configuration and availability."""
-        return {"version": "0.4.0", "sandbox": runtime.settings.sandbox,
+        return {"version": __version__, "sandbox": runtime.settings.sandbox,
                 "sandbox_available": runtime.runner.available}
 
     @app.get("/sessions")

@@ -70,14 +70,15 @@ def test_references_completion_bounds_and_escape(runtime, tmp_path):
 def test_instructions_are_observed_before_file_write(runtime):
     """Defer a write until the model has received its applicable project instructions.
     """
-    (runtime.settings.workspace / "AGENTS.md").write_text("Keep accents.")
+    (runtime.settings.workspace / "sub").mkdir()
+    (runtime.settings.workspace / "sub/AGENTS.md").write_text("Keep accents.")
     runtime.llm.responses = [
-        response(tools=[("write_file", {"path": "x", "content": "é"})]),
-        response(tools=[("write_file", {"path": "x", "content": "é"})]), response()]
+        response(tools=[("write_file", {"path": "sub/x", "content": "é"})]),
+        response(tools=[("write_file", {"path": "sub/x", "content": "é"})]), response()]
     session = runtime.sessions.create()
     runtime.run(session, "Crée")
     assert "non exécuté" in runtime.llm.calls[1][-1]["content"]
-    assert (runtime.settings.workspace / "x").read_text() == "é"
+    assert (runtime.settings.workspace / "sub/x").read_text() == "é"
 
 
 def test_steering_skips_remaining_actions_and_reaches_model(runtime):

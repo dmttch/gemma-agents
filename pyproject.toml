@@ -7,6 +7,16 @@ authors = [
     { name = "dmttch", email = "dmttch@proton.me" }
 ]
 requires-python = ">=3.14.3"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+keywords = ["ollama", "agent", "local", "macos", "developer-tools"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Operating System :: MacOS :: MacOS X",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Software Development",
+]
 dependencies = [
     "click>=8.5.0",
     "croniter>=6.2.4",
@@ -24,6 +34,11 @@ dependencies = [
 [project.scripts]
 gemma-agents = "gemma_agents.main:main"
 
+[project.urls]
+Repository = "https://github.com/dmttch/gemma-agents"
+Issues = "https://github.com/dmttch/gemma-agents/issues"
+Changelog = "https://github.com/dmttch/gemma-agents/blob/main/CHANGELOG.md"
+
 [build-system]
 requires = ["uv_build>=0.12.15,<0.13.0"]
 build-backend = "uv_build"
@@ -37,8 +52,23 @@ line-length = 88
 [tool.ruff.lint]
 select = ["E", "F", "I"]
 
+[tool.coverage.run]
+source = ["gemma_agents"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+
 [dependency-groups]
 dev = [
+    "httpx2>=2.13.0",
     "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
     "ruff>=0.16.8",
+]
+docs = [
+    "myst-parser>=5.1.0",
+    "sphinx>=9.1.0",
+    "sphinx-click>=6.2.0",
+    "sphinx-rtd-theme>=3.1.0",
 ]

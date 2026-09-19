@@ -10,8 +10,10 @@ from gemma_agents.agent.loop import AgentLoop
 from gemma_agents.changes import ChangeStore
 from gemma_agents.checkpoints import Checkpoints
 from gemma_agents.config import Settings
+from gemma_agents.contracts import AgentModel
 from gemma_agents.control import RunControl
 from gemma_agents.llm.ollama import OllamaLLM
+from gemma_agents.locking import WorkspaceLease
 from gemma_agents.memory.database import Database, now_iso
 from gemma_agents.memory.semantic import SemanticMemory
 from gemma_agents.project import ProjectTools
@@ -52,26 +54,33 @@ class RunResult:
 class Runtime:
     """Own shared services, process cleanup, and exclusive access to model execution."""
 
-    def __init__(self, settings: Settings, llm=None):
+    def __init__(self, settings: Settings, llm: AgentModel | None = None):
         """Prepare configured storage and construct workspace-scoped runtime services.
         """
         settings.prepare()
-        self.settings = settings
-        self.database = Database(settings.database_path)
-        self.sessions = SessionManager(self.database, settings.workspace)
-        self.llm = llm or OllamaLLM(settings.model, settings.ollama_host,
-                                   settings.keep_alive)
-        self.runner = SandboxRunner(settings.workspace, settings.sandbox)
-        self.memory = SemanticMemory(self.database, settings.workspace, self.llm,
-                                     settings.embedding_model)
-        skills_dir = settings.skills_dir or settings.storage_dir / "skills"
-        self.skills = SkillLibrary(skills_dir)
-        self.tasks = TaskStore(self.database, settings.workspace)
-        self.processes = {}
-        self.lock = threading.Lock()
-        self.project = ProjectTools(settings.workspace)
-        self.permissions = PermissionStore(self.database, settings.workspace)
-        self.review_sessions = set()
+        self._lease = WorkspaceLease(settings.workspace)
+        self._closed = False
+        try:
+            self._storage_lease = WorkspaceLease(settings.storage_dir, shared=True)
+            self.settings = settings
+            self.database = Database(settings.database_path)
+            self.sessions = SessionManager(self.database, settings.workspace)
+            self.llm = llm or OllamaLLM(settings.model, settings.ollama_host,
+                                       settings.keep_alive)
+            self.runner = SandboxRunner(settings.workspace, settings.sandbox)
+            self.memory = SemanticMemory(self.database, settings.workspace, self.llm,
+                                         settings.embedding_model)
+            skills_dir = settings.skills_dir or settings.storage_dir / "skills"
+            self.skills = SkillLibrary(skills_dir)
+            self.tasks = TaskStore(self.database, settings.workspace)
+            self.processes = {}
+            self.lock = threading.Lock()
+            self.project = ProjectTools(settings.workspace)
+            self.permissions = PermissionStore(self.database, settings.workspace)
+            self.review_sessions = set()
+        except BaseException:
+            self.close()
+            raise
 
     def registry(self, session_id: str) -> ToolRegistry:
         """Build session-bound tools and assign their policy risk levels."""
@@ -124,6 +133,8 @@ class Runtime:
         try:
             if model not in [m.model for m in self.llm.client.list().models]:
                 raise ValueError("Modèle absent d'Ollama ; aucun téléchargement lancé.")
+            if hasattr(self.llm, "validate_model"):
+                self.llm.validate_model(model)
             self.sessions.set_model(session_id, model)
         finally:
             self.lock.release()
@@ -236,10 +247,14 @@ class Runtime:
         loop.
         """
         emit = emit or (lambda event: None)
+        model = self.sessions.model(session_id) or self.settings.model
+        if hasattr(self.llm, "validate_model"):
+            self.llm.validate_model(model)
         supplement = f"\nSkills disponibles :\n{self.skills.list_skills()}"
+        root_instructions = self.project.instructions()
         supplement += ("\nInstructions de projet (portée indiquée, sans extension "
                        "de permissions ; les consignes utilisateur priment) :\n"
-                       + self.project.instructions())
+                       + root_instructions)
         planner = Planner(self.database, session_id)
         checkpoints = Checkpoints(self.database, session_id)
 
@@ -261,6 +276,10 @@ class Runtime:
         gateway = ToolGateway(self.registry(session_id), SecurityPolicy(
             self.settings.workspace, session_id in self.review_sessions),
             approver, self.database, session_id)
+        # Root instructions are already in the model's system context. Defer
+        # only newly encountered scoped instructions or changes to their text.
+        if root_instructions:
+            gateway.instruction_texts.add(root_instructions)
         model = self.sessions.model(session_id) or self.settings.model
         if hasattr(self.llm, "model"):
             self.llm.model = model
@@ -420,9 +439,22 @@ class Runtime:
     def close(self) -> None:
         """Stop managed processes, remove scratch storage, and close the model client.
         """
-        self.runner.close()
-        if hasattr(self.llm, "close"):
-            self.llm.close()
+        if self._closed:
+            return
+        self._closed = True
+        try:
+            if hasattr(self, "runner"):
+                self.runner.close()
+        finally:
+            try:
+                if hasattr(self, "llm") and hasattr(self.llm, "close"):
+                    self.llm.close()
+            finally:
+                try:
+                    if hasattr(self, "_storage_lease"):
+                        self._storage_lease.close()
+                finally:
+                    self._lease.close()
 
     def __enter__(self):
         """Return this runtime for use within a cleanup-managed context."""

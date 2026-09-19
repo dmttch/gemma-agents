@@ -1,553 +1,181 @@
-# Gemma Agents V4
+# Gemma Agents
 
-<!-- Versions: .python-version and uv.lock; uv_build uses its pyproject.toml constraint. -->
-[![Python 3.14.3](https://img.shields.io/badge/Python-3.14.3-3776AB?logo=python&logoColor=white)](https://www.python.org/downloads/release/python-3143/) [![Click 8.5.0](https://img.shields.io/badge/Click-8.5.0-blue)](https://pypi.org/project/click/8.5.0/) [![croniter 6.2.4](https://img.shields.io/badge/croniter-6.2.4-blue)](https://pypi.org/project/croniter/6.2.4/) [![FastAPI 0.141.1](https://img.shields.io/badge/FastAPI-0.141.1-009688?logo=fastapi&logoColor=white)](https://pypi.org/project/fastapi/0.141.1/) [![HTTPX 0.28.1](https://img.shields.io/badge/HTTPX-0.28.1-blue)](https://pypi.org/project/httpx/0.28.1/) [![Ollama 0.6.2](https://img.shields.io/badge/Ollama-0.6.2-000000?logo=ollama&logoColor=white)](https://pypi.org/project/ollama/0.6.2/) [![pathspec 1.1.1](https://img.shields.io/badge/pathspec-1.1.1-blue)](https://pypi.org/project/pathspec/1.1.1/) [![prompt-toolkit 3.0.53](https://img.shields.io/badge/prompt--toolkit-3.0.53-blue)](https://pypi.org/project/prompt-toolkit/3.0.53/) [![Pydantic 2.13.5](https://img.shields.io/badge/Pydantic-2.13.5-E92063?logo=pydantic&logoColor=white)](https://pypi.org/project/pydantic/2.13.5/) [![Rich 15.0.0](https://img.shields.io/badge/Rich-15.0.0-blue)](https://pypi.org/project/rich/15.0.0/) [![rich-click 1.9.9](https://img.shields.io/badge/rich--click-1.9.9-blue)](https://pypi.org/project/rich-click/1.9.9/) [![Uvicorn standard 0.53.0](https://img.shields.io/badge/Uvicorn%5Bstandard%5D-0.53.0-blue)](https://pypi.org/project/uvicorn/0.53.0/) [![pytest 9.1.1](https://img.shields.io/badge/pytest-9.1.1-0A9EDC?logo=pytest&logoColor=white)](https://pypi.org/project/pytest/9.1.1/) [![Ruff 0.16.8](https://img.shields.io/badge/Ruff-0.16.8-D7FF64?logo=ruff&logoColor=black)](https://pypi.org/project/ruff/0.16.8/) [![uv_build >=0.12.15,<0.13.0](https://img.shields.io/static/v1?label=uv_build&message=%3E%3D0.12.15%2C%3C0.13.0&color=DE5FE9&logo=uv&logoColor=white)](https://pypi.org/project/uv-build/)
+Agent de développement local pour **macOS Apple Silicon**, piloté par un modèle
+Ollama installé. Il explore un projet, prépare ou applique des modifications,
+exécute des validations approuvées et conserve les sessions dans SQLite.
 
-Agent local Python piloté par Ollama : boucle d'outils, sessions SQLite,
-mémoire sémantique, skills, plans, tâches persistantes, processus en arrière-plan,
-planification cron et API HTTP/WebSocket. La V3 ajoute une interface terminal
-interactive, le streaming, des points de reprise, des éditions annulables et
-des commandes de validation dont les résultats sont enregistrés. La V4 permet
-d'intervenir pendant l'exécution, recherche dans le projet, corrige après un échec
-de validation et ajoute une revue interactive ainsi que des permissions révocables.
+**État : préparation de la version 1.0.** Le paquet conserve la version 0.4.0
+pendant la qualification. Les résultats mesurés et les limites sont documentés ;
+la présence d'une CI et d'une configuration Read the Docs ne signifie pas qu'une
+release a déjà été publiée.
 
-## Démarrer
+## Installation
 
-Prérequis : macOS, `uv`, Python ≥ 3.14.3 et Ollama en cours d'exécution.
+Prérequis : macOS Apple Silicon, [uv](https://docs.astral.sh/uv/getting-started/installation/),
+Python ≥ 3.14.3, Git et un serveur [Ollama](https://docs.ollama.com/quickstart)
+local en cours d'exécution. Le modèle choisi doit être installé et déclarer le
+support des outils. Le besoin en RAM dépend du modèle ; aucun modèle n'est téléchargé
+par Gemma Agents.
 
 ```sh
-uv sync
-ollama list
+git clone https://github.com/dmttch/gemma-agents.git
+cd gemma-agents
+uv sync --locked
+uv run gemma-agents setup
 uv run gemma-agents doctor
 uv run gemma-agents
 ```
 
-Le modèle par défaut est `gemma4:12b-mlx`, conservé de la V1. Ce nom doit correspondre
-à un modèle installé qui accepte les outils. Pour en choisir un autre :
+`setup` vérifie et conserve le choix du modèle. `doctor` contrôle la plateforme,
+les exécutables, le lancement réel du sandbox et la compatibilité du modèle ;
+un prérequis manquant produit un code de sortie non nul.
+
+Pour installer le paquet dans un environnement isolé :
 
 ```sh
-export AGENT_MODEL="nom-exact-affiché-par-ollama-list"
-uv run gemma-agents --workspace ~/Projects/mon-projet
-```
-
-Le workspace par défaut est `./workspace`. Il doit être distinct du code du runtime,
-de son stockage et du répertoire de skills. Pour travailler sur un autre projet :
-
-```sh
-uv run gemma-agents --workspace ~/Projects/mon-projet run \
-  "Examine le projet, crée un plan, puis identifie les tests à lancer."
-```
-
-`--workspace` se place avant la sous-commande. Les commandes sensibles demandent une
-validation en terminal. Les écritures de fichiers dans le workspace sont autorisées
-sans confirmation, comme en V1.
-
-## Interface terminal
-
-### Nouveautés V4
-
-Pendant un tour, une vue de travail affiche le flux du modèle et les outils, avec
-une zone de saisie indépendante. Écris une précision puis Entrée : elle sera
-intégrée entre deux actions, avec un accusé de prise en compte. Les appels restants
-d'un lot déjà généré sont laissés non exécutés si une précision attend ; le modèle
-peut alors adapter la suite. Le résultat final est rendu en Markdown dans le
-défilement normal du terminal, avec les outils du tour consultables via `/last`.
-
-| Pendant l'exécution | Effet |
-| --- | --- |
-| Une précision + Entrée | Ajouter une consigne au tour courant |
-| `/pause` | Suspendre avant la prochaine action ; l'action en cours peut finir |
-| `/continue` | Reprendre après une pause |
-| `/stop` ou Ctrl+C | Annuler le tour ; conserver son historique |
-| Tab | Passer entre saisie et journal ; flèches/PageUp pour parcourir le journal |
-| Alt+Entrée ou Ctrl+J | Nouvelle ligne dans la saisie |
-| `/once`, `/allow`, `/deny` | Répondre à une approbation en attente |
-
-La pause ne gèle pas les processus OS. L'annulation coupe une commande ponctuelle
-et est vérifiée pendant le streaming ; un appel réseau sans réponse peut attendre
-son timeout. Les processus lancés explicitement en arrière-plan gardent leur cycle
-de vie propre. Une précision arrivée pendant la validation finale d'une tâche
-est enregistrée et la tâche passe `limited` pour permettre sa reprise. Le mode
-`--plain` conserve l'interface séquentielle, sans saisie pendant le travail.
-
-Les sessions reçoivent un titre depuis leur première demande. Les nouvelles
-commandes complètent celles de V3 :
-
-| Commande | Usage |
-| --- | --- |
-| `/rename Mon titre` | Renommer la session |
-| `/sessions texte` | Rechercher dans les titres et conversations du workspace |
-| `/preview IDENTIFIANT` | Aperçu des derniers échanges avant reprise |
-| `/fork` | Dupliquer la conversation et son plan ; le workspace reste partagé |
-| `/export conversation.md` | Export Markdown dans le workspace, sans écraser un fichier |
-| `/model` | Modèle du prochain tour et modèles installés |
-| `/model NOM` | Choisir un modèle installé pour cette session, sans téléchargement |
-| `/allow uv run pytest -q` | Autoriser cette commande exacte pendant 8 heures |
-| `/permissions` | Voir les permissions actives du workspace et leurs expirations |
-| `/permissions revoke ID` | Révoquer une permission |
-| `/review on`, `/review off` | Activer / désactiver la préparation des éditions |
-| `/review` | Choisir une édition, puis les blocs à appliquer ou annuler |
-
-Une duplication copie les messages, le plan, le point de reprise, le titre et
-le choix du modèle. Elle ne copie ni les permissions ni le journal d'annulation,
-et ne crée pas de branche ou de copie des fichiers. Ne travaille pas simultanément
-dans les deux conversations sur les mêmes fichiers.
-
-### Recherche et références de fichiers
-
-Dans un message, utilise `@src/module.py`, `@src/module.py:20-40`, ou
-`@"dossier avec espaces/module.py:20-40"`. Tab complète les chemins lors de la
-saisie initiale. Au plus cinq références sont jointes, dans la limite de 16000
-caractères du message enrichi. Une référence explicite peut viser un fichier
-ignoré ; la recherche automatique respecte les `.gitignore` imbriqués.
-
-Les outils `find_files`, `search_text` (texte littéral) et `project_instructions`
-permettent au modèle de cibler son exploration. Les recherches sont bornées,
-ignorent les liens symboliques et les répertoires de dépendances/caches usuels.
-Le `AGENTS.md` racine est chargé au début du tour. Lors du premier accès à une cible
-avec des instructions applicables, le gateway les présente avant d'exécuter
-l'appel. Les conventions du sous-dossier ne s'appliquent qu'à ce sous-dossier ;
-elles n'accordent jamais de permissions et les consignes utilisateur priment.
-
-### Revue des modifications
-
-`/review on` fait préparer les éditions des outils fichiers sans les appliquer.
-Les commandes et écritures Git sont refusées dans ce mode ; des processus déjà
-actifs doivent être arrêtés avant de l'activer. Le mode est propre à la session
-dans le runtime courant et doit être réactivé après redémarrage.
-
-`/review` affiche une sélection des éditions, puis les blocs modifiés. Tu peux
-appliquer une proposition, la rejeter, ou annuler des blocs d'une édition appliquée.
-Le contenu actuel doit toujours correspondre au contenu attendu : les changements
-utilisateur intervenus entre-temps provoquent un refus. Après application partielle,
-la proposition est consommée ; les blocs non sélectionnés ne sont pas appliqués.
-Une nouvelle proposition est nécessaire pour les appliquer plus tard.
-
-En mode simple, les équivalents sont `/review accept ID [BLOC…]`,
-`/review reject ID` et `/review undo ID [BLOC…]`. Sans liste de blocs, l'action
-concerne toute l'édition. `/diff` permet d'inspecter les changements avant cette
-commande ; les identifiants de blocs sont affichés dans la revue interactive.
-
-### Permissions et corrections automatiques
-
-Une permission correspond à un programme et ses arguments exacts, jamais à un
-préfixe de commande. Elle est partagée entre `run_command` et `run_check`, mais
-n'autorise pas `start_process`, Git ou le Web. Elle reste soumise à la politique
-et au sandbox. Les permissions expirent au bout de 8 heures par défaut, même si
-la conversation est reprise. Leur révocation prend effet au prochain appel.
-
-Pour autoriser explicitement des commandes d'une tâche ou d'une planification :
-
-```sh
-uv run gemma-agents tasks add "Corrige le parseur" \
-  --check "uv run pytest -q" --allow-command "uv run pytest -q"
-uv run gemma-agents schedule add "0 9 * * *" "Lance les tests et résume les échecs" \
-  --allow-command "uv run pytest -q" --grant-hours 24
-```
-
-`--grant-hours` accepte 1 à 168 heures. La permission d'une planification est
-consultée lors de chaque appel de ses tâches générées : la révoquer concerne
-aussi les occurrences déjà en attente. Sans permission applicable, un worker
-continue de refuser les actions sensibles.
-
-Après échec des checks déclarés, le runtime transmet les erreurs au modèle,
-puis relance les mêmes commandes. `AGENT_REPAIR_ATTEMPTS` limite les corrections
-supplémentaires (2 par défaut, de 0 à 5). Les tours de correction partagent le
-budget initial de `AGENT_MAX_STEPS`. Les refus ne déclenchent pas de correction
-automatique, et une nouvelle validation en échec sans changement du projet arrête
-la boucle. Trois appels d'outil identiques consécutifs arrêtent aussi le tour avant
-la troisième exécution. Un appel invalide corrigé avec succès ne bloque plus à lui
-seul la conclusion du tour.
-
-`/checks` affiche `current`, `stale` ou `unknown` en plus du résultat observé.
-L'empreinte couvre les fichiers non ignorés, jusqu'à 10000 fichiers / 50 Mo ;
-elle devient inconnue au-delà ou si la lecture échoue. Ce contrôle ne détecte pas
-les changements des fichiers ignorés, des dépendances ou des services externes.
-Un check qui modifie lui-même des fichiers est signalé comme obsolète. Un statut
-`passed` décrit sa sortie observée ; il ne remplace pas cette indication de validité.
-
-Lance `uv run gemma-agents` dans un terminal interactif. La conversation terminée
-reste dans le défilement normal du terminal. Les réponses finales sont rendues en
-Markdown, avec le code coloré ; la vue de travail montre leur génération en direct.
-Les outils affichent une ligne d'activité et un extrait de résultat. Les demandes
-d'approbation montrent les arguments exacts de l'appel avant validation.
-
-| Raccourci | Action |
-| --- | --- |
-| Entrée | Envoyer la saisie |
-| Alt+Entrée (ou Échap puis Entrée), Ctrl+J | Insérer une nouvelle ligne |
-| Collage multiligne | Conserver les lignes avant envoi (bracketed paste) |
-| Tab | Compléter une commande ou un identifiant après `/resume ` |
-| Haut / Bas, Ctrl+R | Parcourir / rechercher l'historique de saisie |
-| Ctrl+C pendant la saisie | Annuler la saisie |
-| Ctrl+C pendant le travail | Interrompre le tour, conserver la session |
-| Ctrl+D sur une saisie vide | Quitter |
-
-Sur macOS, si Option+Entrée n'est pas transmis comme Alt+Entrée, utilise
-Échap puis Entrée, ou Ctrl+J. L'historique de saisie est rechargé depuis les
-messages de la session, sans fichier d'historique global entre projets.
-
-| Commande | Usage |
-| --- | --- |
-| `/help` | Toutes les commandes |
-| `/new`, `/sessions`, `/resume IDENTIFIANT` | Créer, lister, reprendre une session |
-| `/session`, `/history` | Identifiant et derniers messages |
-| `/plan`, `/checkpoint` | Étapes et point de reprise durable |
-| `/diff` | Journal des éditions de la session, avec identifiants |
-| `/undo [IDENTIFIANT]` | Annuler une édition ; la dernière par défaut |
-| `/check uv run pytest -q`, `/checks` | Exécuter une validation, consulter les résultats |
-| `/tasks`, `/task IDENTIFIANT` | Lister et exécuter les tâches, puis ouvrir leur session |
-| `/retry IDENTIFIANT` | Remettre en attente une tâche inspectée avant reprise |
-| `/tools`, `/last` | Activer les détails / lire les sorties du dernier tour |
-| `/clear`, `/quit` | Effacer l'écran / quitter sans supprimer l'historique |
-
-`uv run gemma-agents --plain` désactive l'éditeur enrichi et les animations.
-Ce mode est également choisi automatiquement si l'entrée ou la sortie n'est
-pas un terminal. `NO_COLOR=1` désactive les couleurs Rich.
-
-### Sessions et migration V1 / V2 / V3
-
-```sh
-uv run gemma-agents sessions
-uv run gemma-agents --resume IDENTIFIANT
-uv run gemma-agents run --resume IDENTIFIANT "Continue le travail"
-```
-
-Le schéma SQLite est étendu sans supprimer les sessions ni les messages existants.
-Si `src/gemma_agents/storage/agent.db` existe, ce stockage V1 est repris par défaut.
-Sinon, le stockage est `~/.local/share/gemma-agents`. Pour une autre installation V1 :
-
-```sh
-export AGENT_STORAGE=/chemin/vers/ancien/storage
-export AGENT_WORKSPACE=/chemin/vers/ancien/workspace
-uv run gemma-agents --resume IDENTIFIANT
-```
-
-Une session ne peut être reprise que dans son workspace d'origine. L'historique
-complet reste en base. Les résultats d'outils trop longs sont bornés pour le modèle ;
-les anciens tours sont remplacés dans le contexte par des extraits bornés.
-Dans un tour long, les anciens lots d'appels terminés peuvent être condensés en
-conservant la demande et le dernier lot complet d'appels/résultats. Une demande
-ou un dernier lot encore trop volumineux s'arrête explicitement.
-Les appels d'outils interrompus sont signalés comme « résultat inconnu » à la reprise,
-sans les réexécuter automatiquement.
-
-Le modèle dispose de `save_checkpoint(objective, decisions, next_steps)` et
-`get_checkpoint` pour conserver une synthèse de travail. Le plan et ce point de
-reprise sont rechargés à chaque étape. Les extraits automatiques restent des
-extraits, et les points de reprise des déclarations du modèle : ni l'un ni l'autre
-ne prouve qu'une action a réussi. Le budget affiché est en caractères JSON,
-pas en tokens. Les exécutions ont un journal persistant de début/fin ; un arrêt
-brutal reste visible comme exécution inachevée à la prochaine ouverture.
-
-## Éditions et validations
-
-`read_file` accepte `start_line` et `end_line` (lignes inclusives, numérotées à
-partir de 1 ; 200 lignes par défaut, au plus 500). Les résultats sont bornés pour
-éviter de remplir le contexte avec un fichier entier. Le résultat destiné au modèle
-sépare le contenu brut et les métadonnées de navigation en JSON, pour éviter de
-recopier accidentellement des numéros de ligne. Les espaces et fins de ligne du
-contenu sont préservés ; `partial_line` signale une ligne coupée par la limite.
-
-Les outils `write_file`, `replace_text` et `apply_patch` enregistrent les contenus
-avant/après dans SQLite et écrivent par remplacement atomique. `apply_patch`
-accepte un diff unifié exact sur un fichier existant, sans renommage ni recherche
-approximative. `/diff` affiche ces éditions, indépendamment des changements Git.
-
-`/undo` restaure le contenu précédent seulement si le contenu actuel est encore
-identique au résultat enregistré. Si quelqu'un a modifié le fichier, l'annulation
-est refusée. Une création annulée supprime le fichier créé ; les répertoires
-créés restent présents. Les changements effectués par des commandes, Git ou des
-processus ne sont **pas** couverts. Une édition laissée `pending` par un arrêt
-brutal doit être inspectée ; elle n'est pas annulée automatiquement. Ces contrôles
-ne protègent pas contre les courses de modifications concurrentes : conserve une
-seule instance d'écriture par workspace.
-
-`run_check` utilise le même sandbox, la même politique et les mêmes approbations
-que `run_command`, et conserve le code de sortie observé. `/checks` montre les
-résultats à leur date d'exécution ; une modification ultérieure peut les rendre
-obsolètes. Pour une tâche, fournis des critères explicites :
-
-```sh
-uv run gemma-agents tasks add "Corrige le parseur CSV" \
-  --check "uv run pytest -q" --check "uv run ruff check src"
-uv run gemma-agents tasks run IDENTIFIANT
-```
-
-Ces commandes sont exécutées après la conclusion du modèle. Après épuisement des
-corrections autorisées, un code non nul ou un timeout entraîne `failed`, une
-approbation et une permission absentes `blocked`. Le résultat expose
-`verification` (`passed`, `failed`, `blocked`, `not_run` ou `not_requested`).
-Sans critères, `completed` signifie seulement que le tour du modèle est terminé.
-Les checks planifiés nécessitent une permission explicite pour passer sans approbateur.
-
-## Mémoire sémantique
-
-La mémoire utilise les embeddings Ollama et une recherche cosinus dans SQLite.
-Aucun service vectoriel externe n'est nécessaire. Installe le modèle d'embeddings
-une fois si tu souhaites utiliser cette fonction :
-
-```sh
-ollama pull embeddinggemma
-uv run gemma-agents memory add "Ce projet utilise Python, uv et pytest."
-uv run gemma-agents memory search "Comment lancer les tests Python ?"
-uv run gemma-agents memory forget IDENTIFIANT
-```
-
-Les outils `remember`, `recall` et `forget` sont accessibles à l'agent. Les souvenirs
-sont séparés par workspace **et** modèle d'embeddings. Changer le modèle ne réindexe
-pas les anciens souvenirs. Si des souvenirs existent mais que le modèle d'embeddings
-est absent, la conversation continue avec un avertissement ; la recherche explicite
-renvoie une erreur. La recherche est linéaire et convient à une petite mémoire locale.
-
-## Skills et plans
-
-Les skills sont des instructions Markdown installées par l'utilisateur dans
-`$AGENT_STORAGE/skills/<nom>/SKILL.md` (ou `AGENT_SKILLS`). Ils sont à l'extérieur du
-workspace et ne peuvent pas accorder de permissions supplémentaires.
-
-Exemple fourni : [examples/skills/python-project/SKILL.md](examples/skills/python-project/SKILL.md).
-Installation avec le stockage par défaut :
-
-```sh
-mkdir -p ~/.local/share/gemma-agents/skills/python-project
-cp examples/skills/python-project/SKILL.md \
-  ~/.local/share/gemma-agents/skills/python-project/SKILL.md
-uv run gemma-agents skills
-```
-
-L'agent découvre les skills avec `list_skills`, les lit avec `read_skill`, et suit
-son travail avec `set_plan`, `get_plan` et `update_plan`. Les plans persistent par
-session. Le planner est guidé par le modèle : il ne lance pas d'autres agents.
-
-## Tâches et planification
-
-```sh
-uv run gemma-agents tasks add "Inspecte les fichiers et produis un rapport."
-uv run gemma-agents tasks list
-uv run gemma-agents tasks run IDENTIFIANT
-uv run gemma-agents schedule add "0 9 * * 1-5" \
-  "Liste les fichiers du projet et résume son organisation." --timezone Europe/Paris
-uv run gemma-agents schedule list
-uv run gemma-agents worker
-```
-
-`tasks run` est interactif et peut demander une approbation. Le worker traite les
-tâches en attente et les échéances sans approbateur : une action sensible refusée
-entraîne un statut `blocked`, même si le modèle prétend avoir réussi.
-
-- États : `pending`, `running`, `completed`, `blocked`, `failed`, `limited`, `interrupted`.
-- Une tâche est réclamée atomiquement avant exécution ; elle utilise une nouvelle
-  session à sa première exécution, dont l'identifiant est enregistré dans la tâche.
-  Une relance réutilise cette session et demande au modèle d'inspecter les effets
-  précédents avant de poursuivre. Ctrl+C produit `interrupted` et libère le runtime.
-- Le worker doit rester ouvert. Aucun cron système, LaunchAgent ou démarrage
-  automatique n'est installé sur le Mac.
-- Les échéances sont conservées en UTC et calculées dans le fuseau choisi. Après un
-  arrêt prolongé, une seule tâche est créée par planification échue, sans rejouer
-  toutes les occurrences manquées.
-- Après une interruption brutale, une tâche peut rester `running`. Examine ses
-  effets avant `uv run gemma-agents tasks retry IDENTIFIANT` : les modifications
-  déjà effectuées ne sont pas annulées. La reprise conserve l'historique mais ne
-  garantit pas une exécution exactement une fois : le modèle doit inspecter l'état.
-- `uv run gemma-agents worker --once` traite la file une fois.
-- `uv run gemma-agents schedule pause IDENTIFIANT` suspend une planification ;
-  ajouter `--resume` la réactive.
-
-La fin d'un tour sans outil signifie que le modèle estime avoir terminé. Le runtime
-n'en fait pas une preuve de correction : les résultats des vérifications restent
-à consulter. Utilise une seule instance de runtime par workspace pour les écritures.
-
-## Commandes, processus et sandbox
-
-Les outils `run_command` et `start_process` partagent le même exécuteur sans shell.
-Utilise `uv run pytest`, `uv run script.py`, etc. `start_process` retourne un
-identifiant utilisable avec `process_status` et `stop_process`.
-
-Les processus persistent **entre les tours du même runtime**, pas après son arrêt.
-Ils sont limités à quatre actifs par session ; le runtime conserve les derniers
-40 000 octets de sortie et arrête les groupes de processus à sa fermeture. Ceux
-d'une tâche en file sont arrêtés à la fin de cette tâche. La commande ponctuelle
-est bornée par `AGENT_COMMAND_TIMEOUT`.
-
-Par défaut, les processus et les outils Git passent par `sandbox-exec` sur macOS :
-
-- lecture/écriture du workspace et d'un répertoire temporaire privé au runtime ;
-- lecture des bibliothèques système, outils Homebrew et environnements Python ;
-- réseau refusé et environnement minimal, sans transmettre les variables secrètes ;
-- exécution refusée si le sandbox manque, sans repli automatique ;
-- hooks Git, fsmonitor, diff externe et textconv désactivés pour les outils Git.
-
-Préinstalle les dépendances du projet depuis ton terminal avec `uv sync` : les
-processus de l'agent sont hors ligne et n'ont pas accès au cache uv personnel.
-Les métadonnées du système de fichiers sont lisibles ; il ne s'agit pas d'un système
-masquant l'existence de tous les chemins.
-
-**Limite :** Seatbelt / `sandbox-exec` est déprécié par Apple. Cet adaptateur est
-expérimental, testé sur le Mac de développement, et ne constitue pas une frontière
-de sécurité auditée face à du code hostile. Les chemins résolus des outils fichiers
-bloquent les sorties simples et les liens symboliques ; ils ne garantissent pas
-l'absence de courses avec un autre processus modifiant les liens. Utilise des
-workspaces de confiance. Une VM serait préférable pour exécuter du code non fiable.
-
-`AGENT_SANDBOX=off` désactive explicitement l'isolation OS pour un environnement de
-confiance ; les approbations restent requises. `doctor` permet de tester le lancement
-sandboxé sans lancer le modèle.
-
-## Recherche Web
-
-Configure un serveur SearXNG dont le format JSON est activé :
-
-```sh
-export AGENT_SEARXNG_URL=http://localhost:8080
-uv run gemma-agents
-```
-
-L'outil `web_search` est alors proposé au modèle. Chaque recherche requiert une
-approbation car la requête quitte le runtime. Le serveur est fixé par l'utilisateur ;
-le modèle ne choisit pas l'hôte. Les réponses sont bornées et traitées comme des
-données non fiables. Pas de navigateur automatisé ni de lecture arbitraire d'URL
-à ce stade. Les tâches planifiées ne peuvent pas approuver une recherche Web.
-
-## API HTTP et WebSocket
-
-```sh
-export AGENT_API_TOKEN="$(openssl rand -hex 32)"
-uv run gemma-agents serve
-# Ajouter --scheduler pour traiter aussi les tâches et les échéances.
-```
-
-L'API écoute seulement sur `127.0.0.1:8765`. Elle exige un jeton Bearer d'au moins
-24 caractères, y compris sur le WebSocket. Les requêtes portant un en-tête Origin
-sont refusées : l'API vise des clients locaux en CLI, pas une interface navigateur.
-N'expose pas le serveur sur Internet. Il n'a ni utilisateurs multiples ni quotas.
-
-```sh
-curl -H "Authorization: Bearer $AGENT_API_TOKEN" \
-  -X POST http://127.0.0.1:8765/sessions
-curl -H "Authorization: Bearer $AGENT_API_TOKEN" \
-  -H 'Content-Type: application/json' \
-  -d '{"prompt":"Liste les fichiers du workspace."}' \
-  http://127.0.0.1:8765/sessions/IDENTIFIANT/messages
-```
-
-| Route | Usage |
-| --- | --- |
-| `GET /health` | Version et état de configuration du sandbox |
-| `GET /openapi.json` | Schéma des routes HTTP, authentifié |
-| `GET /sessions` | Sessions du workspace |
-| `POST /sessions` | Nouvelle session |
-| `GET /sessions/{id}/messages` | Historique |
-| `POST /sessions/{id}/messages` | Un tour, réponse finale HTTP |
-| `WS /sessions/{id}/ws` | Un tour avec événements intermédiaires |
-| `GET /approvals` | Appels sensibles en attente |
-| `POST /approvals/{id}` | `{"approved": true}` ou `false` |
-| `GET /tasks`, `POST /tasks` | Lister / créer avec `{"prompt":"…","checks":["uv run pytest"]}` (`checks` facultatif) |
-| `POST /tasks/{id}/run` | Exécuter sans approbation interactive |
-| `GET /schedules` | Lire les planifications créées en CLI |
-
-Un appel HTTP de conversation attend sa fin ; s'il demande une approbation, consulte
-`/approvals` depuis une seconde requête. Chaque approbation porte sur un seul appel
-et expire après 120 secondes. N'approuve que des arguments effectivement inspectés.
-Une déconnexion WebSocket refuse les approbations en attente ; un appel Ollama déjà
-en cours peut aller jusqu'à son timeout avant l'arrêt du tour.
-
-Le WebSocket reçoit `{"prompt":"…"}` puis émet `step`, `tool_request`, `tool_result`,
-`warning`, `context`, `token`, `final` ou `error`, avant fermeture. `token` contient
-les fragments de réponse ; `context` indique la taille et les condensations du
-contexte. Les clients doivent accepter ces nouveaux événements V3.
-Exemple : [examples/ws_client.py](examples/ws_client.py).
-Un seul tour est accepté à la fois par runtime ; un second appel HTTP reçoit `409`.
-Les paramètres invalides donnent `400` ou `422`, une authentification absente `401`.
-
-## Configuration
-
-| Variable | Valeur par défaut |
-| --- | --- |
-| `AGENT_MODEL` | `gemma4:12b-mlx` |
-| `OLLAMA_HOST` | `http://localhost:11434` |
-| `AGENT_WORKSPACE` | `./workspace` |
-| `AGENT_STORAGE` | ancien stockage V1 s'il existe, sinon `~/.local/share/gemma-agents` |
-| `AGENT_SKILLS` | `$AGENT_STORAGE/skills` |
-| `AGENT_EMBEDDING_MODEL` | `embeddinggemma` |
-| `AGENT_MAX_STEPS` | `20`, partagés avec les corrections automatiques |
-| `AGENT_REPAIR_ATTEMPTS` | `2` |
-| `AGENT_COMMAND_TIMEOUT` | `120` secondes |
-| `AGENT_KEEP_ALIVE` | `15m` |
-| `AGENT_CONTEXT_CHARS` | `60000` caractères JSON, estimation et non tokens |
-| `AGENT_SANDBOX` | `required` (`off` est explicite) |
-| `AGENT_SEARXNG_URL` | vide : outil Web absent |
-| `AGENT_API_TOKEN` | vide : démarrage API refusé |
-
-Les appels et arguments d'outils sont journalisés dans la table `audit` avec leur
-résultat (`executed`, `denied`, `error`). `executed` indique que la fonction a été
-appelée, pas qu'un sous-processus est sorti avec succès. L'historique et les audits
-peuvent contenir des données de projet ; SQLite n'est pas chiffré.
-
-## Architecture et vérification
-
-```text
-CLI / HTTP / WebSocket / worker
-              │
-           Runtime ─── SQLite (sessions, mémoire, plans, tâches, cron, audit)
-              │
-    ContextBuilder + Ollama + SkillLibrary
-              │
-          AgentLoop
-              │
-    ToolGateway : validation → politique → approbation → audit
-              │
-    fichiers / mémoire / plans / Web / processus / Git
-                                         │
-                                  SandboxRunner macOS
-```
-
-Les modules de V1 sont conservés et raccordés via des imports de paquet corrects.
-`runtime.py` assemble les composants ; `main.py` expose Click/rich-click et Rich.
-La couche HTTP ne contourne pas le gateway. Les dépendances sont verrouillées dans
-`uv.lock` et les tests utilisent pytest.
-
-```sh
-uv run pytest -q
-uv run ruff check src tests examples
 uv build
+uv tool install --python 3.14 ./dist/gemma_agents-0.4.0-py3-none-any.whl
+gemma-agents setup
+gemma-agents doctor
 ```
 
-La suite utilise un faux LLM et des répertoires temporaires : elle couvre la migration
-V1, les outils, la mémoire, les refus, les plans, la reprise, les cron, HTTP et WebSocket.
-Les tests V3 couvrent aussi les patchs et conflits d'annulation, la condensation du
-contexte, les checkpoints, les critères de validation, les interruptions, le streaming
-et la saisie terminal (dont le collage multiligne).
-Le test d'intégration Seatbelt s'exécute réellement sur macOS (ignoré ailleurs).
-Aucun test ne télécharge de modèle ou de dépendances de projet.
+Les exemples suivants utilisent cette installation. Depuis les sources, préfixez
+les commandes `gemma-agents` par `uv run`.
 
-Évaluation facultative avec un vrai modèle déjà installé :
+## Première utilisation
 
 ```sh
-uv run examples/evaluate.py --model gemma4:12b-mlx --output /tmp/gemma-evaluation.json
+mkdir -p ~/Projects/gemma-demo
+gemma-agents --workspace ~/Projects/gemma-demo run \
+  "Crée hello.txt contenant Bonjour, puis relis-le pour vérifier."
 ```
 
-Trois scénarios dans un workspace temporaire mesurent création, édition et reprise
-après redémarrage du runtime, avec contrôle des fichiers produits, durée et nombre
-d'appels d'outils. Aucun téléchargement ni approbation de commande n'est effectué.
-Ce petit banc d'essai ne mesure pas la qualité sur tous les projets.
+`--workspace`, `--model` et `--json` sont des options globales : elles se placent
+avant la sous-commande. Le workspace par défaut est `./workspace` ; il doit être
+distinct du code du runtime, du stockage et des skills.
 
-Le banc V4 ajoute un bug corrigé avec pytest, une modification de plusieurs fichiers,
-une interruption réelle du tour et la récupération après un appel invalide :
+En mode interactif, `/help` présente les commandes. `/review on` prépare les
+éditions avant application, `/review` permet de sélectionner les changements,
+`/diff` les inspecte et `/undo` annule une édition si le fichier n'a pas changé.
+Ce mode de revue doit être réactivé après redémarrage.
+
+Une seule instance peut ouvrir un workspace. Le verrou fonctionne entre terminal,
+worker et serveur, même si leurs stockages diffèrent, et se libère après un crash.
+Les éditeurs et autres programmes ne prennent pas ce verrou.
+
+## Tâches vérifiées
+
+Préinstallez les dépendances du projet avec `uv sync --locked` dans votre terminal.
+Les commandes de l'agent sont hors ligne et n'utilisent pas votre cache uv personnel.
 
 ```sh
-uv run examples/evaluate_v4.py --output /tmp/gemma-v4-evaluation.json
-uv run examples/evaluate_v4.py --scenario invalid_tool
+gemma-agents --workspace ~/Projects/mon-projet tasks add \
+  "Corrige le parseur" --check "uv run pytest -q"
+gemma-agents --workspace ~/Projects/mon-projet tasks run IDENTIFIANT
 ```
 
-Il utilise des workspaces temporaires, autorise seulement sa commande de test exacte
-et ne télécharge aucun modèle. Le scénario pytest nécessite les dépendances de
-développement installées et le sandbox macOS disponible. Les tests du projet couvrent
-aussi la saisie pendant le travail, les permissions, leur révocation et expiration,
-la validité des checks, les références, les instructions et la revue partielle.
+Remplacez `IDENTIFIANT` par l'identifiant retourné. Les validations sont exécutées
+après la réponse du modèle. Les corrections automatiques partagent le budget du
+tour initial. Sans critères, `completed` signifie seulement que le tour est terminé.
 
-Références : [embeddings Ollama](https://docs.ollama.com/api/embed),
-[WebSockets FastAPI](https://fastapi.tiangolo.com/advanced/websockets/),
-[croniter](https://github.com/pallets-eco/croniter),
-[limites de sandbox-exec discutées chez Apple](https://developer.apple.com/forums/thread/661939).
-[Interface de saisie prompt-toolkit](https://python-prompt-toolkit.readthedocs.io/en/stable/pages/asking_for_input.html).
+Pour un script :
+
+```sh
+gemma-agents --json --workspace ~/Projects/mon-projet run "Inspecte le projet"
+```
+
+Le résultat JSON va sur stdout, la progression sur stderr. Aucune approbation
+interactive n'est demandée en mode JSON. Les codes principaux sont `0` (terminé),
+`1` (échec), `2` (syntaxe), `3` (bloqué ou occupé), `4` (limite), `130` (interruption).
+Les permissions persistées autorisent uniquement un programme et ses arguments
+exacts, pendant leur durée de validité.
+
+## Fonctions disponibles
+
+- Conversation terminal, streaming, interventions pendant le travail et reprise.
+- Exploration du projet, références `@fichier`, instructions `AGENTS.md` et skills.
+- Éditions journalisées, revue par blocs et annulation avec contrôle des conflits.
+- Plans, checkpoints, tâches, validations, permissions expirantes et planification cron.
+- Mémoire sémantique facultative, processus bornés et outils Git contrôlés.
+- API HTTP/WebSocket locale avec jeton Bearer ; recherche Web facultative via SearXNG.
+- Sauvegarde/restauration SQLite, export/suppression de sessions et purge explicite des audits.
+
+## Sécurité et données
+
+Le sandbox macOS refuse le réseau des processus et limite leurs accès aux fichiers.
+Les actions sensibles requièrent une approbation ou une permission exacte.
+L'API écoute sur `127.0.0.1` et ne doit pas être exposée à Internet.
+
+Le modèle peut modifier les fichiers du workspace ; une commande approuvée peut
+les supprimer. Le journal d'annulation ne couvre pas les effets des commandes ou
+de Git. `sandbox-exec` est un mécanisme Apple déprécié, sans audit de sécurité du
+projet contre du code hostile. Utilisez un workspace de confiance et conservez
+vos sauvegardes. Voir [SECURITY.md](SECURITY.md) et [le guide de sécurité](docs/security.md).
+
+Le stockage est `~/.local/share/gemma-agents`, ou `AGENT_STORAGE` explicite ;
+un ancien stockage adjacent au paquet reste reconnu. SQLite n'est pas chiffré.
+Les migrations préservent les données, sauvegardent avant mise à niveau et
+refusent les schémas futurs.
+
+```sh
+mkdir -p ~/Backups/gemma
+gemma-agents storage backup ~/Backups/gemma/avant-maj.db
+# Fermer toutes les instances utilisant ce stockage avant restauration.
+gemma-agents storage restore ~/Backups/gemma/avant-maj.db
+```
+
+Une sauvegarde SQLite ne contient ni les fichiers du projet, ni les skills, ni
+`config.toml`. Une restauration révoque les permissions enregistrées et conserve
+une copie de secours de la base remplacée. Voir [maintenance des données](docs/storage.md).
+
+## Documentation
+
+La documentation Sphinx comprend guides, configuration, commandes générées depuis
+Click, architecture et référence Python générée depuis les docstrings.
+
+| Besoin | Guide |
+| --- | --- |
+| Installer et démarrer | [Installation](docs/installation.md) |
+| Utiliser la conversation et la revue | [Terminal](docs/terminal.md) |
+| Mémoire, skills, tâches et cron | [Tâches](docs/tasks.md) |
+| Configurer les limites et services | [Configuration](docs/configuration.md) |
+| Intégrer un client local | [API HTTP/WebSocket](docs/api.md) |
+| Comprendre les protections | [Sécurité](docs/security.md) |
+| Sauvegarder, restaurer, supprimer | [Stockage](docs/storage.md) |
+| Comprendre et contribuer au code | [Architecture](docs/architecture.md), [développement](docs/development.md) |
+| Évaluer et livrer | [Évaluation](docs/evaluation.md), [release](docs/release.md) |
+| Résoudre un problème | [Dépannage](docs/troubleshooting.md) |
+
+```sh
+uv sync --locked --group docs
+uv run --locked --group docs sphinx-build -W --keep-going -b html docs docs/_build/html
+open docs/_build/html/index.html
+```
+
+La configuration [Read the Docs](.readthedocs.yaml) utilise uv et le groupe `docs`.
+L'activation du projet hébergé est expliquée dans le guide de release ; aucune URL
+publique n'est annoncée tant que le service n'a pas été raccordé.
+
+## Développement et validation
+
+```sh
+uv run --locked pytest -q
+uv run --locked ruff check src tests examples scripts docs/conf.py
+uv build
+uv run --locked scripts/smoke_wheel.py dist/gemma_agents-0.4.0-py3-none-any.whl
+uv run --locked examples/evaluate_release.py --model gemma4:12b-mlx \
+  --repetitions 3 --output /tmp/gemma-acceptance.json
+```
+
+Le nom `gemma4:12b-mlx` est celui du modèle de développement, pas une valeur imposée.
+Les tests déterministes n'utilisent pas de modèle. Les tests d'isolation s'exécutent
+réellement sur macOS ; la CI Linux vérifie seulement le code portable et les docs.
+Le banc réel mesure six scénarios répétés et conserve les échecs dans son rapport.
+
+Consultez [CONTRIBUTING.md](CONTRIBUTING.md), [le changelog](CHANGELOG.md) et
+[les références officielles](docs/sources.md).
+
+## Licence
+
+[Apache-2.0](LICENSE), choisie par le mainteneur. Les modèles et dépendances
+conservent leurs propres licences.

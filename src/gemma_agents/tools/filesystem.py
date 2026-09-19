@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from gemma_agents.changes import ChangeStore, atomic_write, patch_text
+from gemma_agents.tools.results import ToolFailure
 
 
 class FileSystemTools:
@@ -53,10 +54,10 @@ class FileSystemTools:
         root = self._safe_path(directory)
 
         if not root.exists():
-            return f"Dossier inexistant : {directory}"
+            return ToolFailure(f"Dossier inexistant : {directory}")
 
         if not root.is_dir():
-            return f"Ce chemin n'est pas un dossier : {directory}"
+            return ToolFailure(f"Ce chemin n'est pas un dossier : {directory}")
 
         iterator = (
             root.rglob("*")
@@ -107,10 +108,10 @@ class FileSystemTools:
         file_path = self._safe_path(path)
 
         if not file_path.exists():
-            return f"Fichier inexistant : {path}"
+            return ToolFailure(f"Fichier inexistant : {path}")
 
         if not file_path.is_file():
-            return f"Ce chemin n'est pas un fichier : {path}"
+            return ToolFailure(f"Ce chemin n'est pas un fichier : {path}")
 
         if start_line < 1 or end_line < start_line or end_line - start_line >= 500:
             raise ValueError("Plage invalide : 1 à 500 lignes par lecture.")
@@ -143,7 +144,7 @@ class FileSystemTools:
                               ensure_ascii=False)
 
         except UnicodeDecodeError:
-            return (
+            return ToolFailure(
                 "Impossible de lire ce fichier comme "
                 "texte UTF-8."
             )
@@ -167,7 +168,7 @@ class FileSystemTools:
         file_path = self._safe_path(path)
 
         if file_path.exists() and not overwrite:
-            return (
+            return ToolFailure(
                 f"Refus : {path} existe déjà. "
                 "Utilise overwrite=true si nécessaire."
             )
@@ -200,7 +201,7 @@ class FileSystemTools:
         file_path = self._safe_path(path)
 
         if not file_path.exists():
-            return f"Fichier inexistant : {path}"
+            return ToolFailure(f"Fichier inexistant : {path}")
 
         if not old_text:
             raise ValueError("Le fragment à remplacer doit être non vide.")
@@ -209,20 +210,18 @@ class FileSystemTools:
         if file_path.stat().st_size > self.MAX_READ_SIZE:
             raise ValueError("Fichier trop volumineux pour replace_text.")
 
-        content = file_path.read_text(
-            encoding="utf-8"
-        )
+        content = file_path.read_bytes().decode("utf-8")
 
         occurrences = content.count(old_text)
 
         if occurrences == 0:
-            return (
+            return ToolFailure(
                 "Modification impossible : "
                 "le texte recherché n'existe pas."
             )
 
         if occurrences > 1:
-            return (
+            return ToolFailure(
                 "Modification refusée : "
                 f"{occurrences} occurrences trouvées. "
                 "Fournis un fragment plus précis."
