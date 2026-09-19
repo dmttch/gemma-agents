@@ -24,5 +24,5 @@ de signaler l'absence d'isolation. Ne l'utilisez pas comme solution automatique
 
 Pour signaler un problème, joindre la version, macOS/architecture, le modèle,
 le diagnostic et une reproduction minimale. Retirez les contenus privés des
-historiques, chemins et sorties. Voir [le guide de sécurité](security.md#signaler-une-vulnerabilite)
+historiques, chemins et sorties. Voir [le guide de sécurité](security.md)
 pour les signalements de sécurité.
