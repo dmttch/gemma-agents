@@ -89,6 +89,29 @@ class SandboxRunner:
         self.scratch = Path(self._temp.name).resolve()
         self.processes: list[ManagedProcess] = []
         self.cancel_event = None
+        # Capture operator tool locations before project code can run. Never
+        # resolve a tool from the workspace, even when it appears on PATH.
+        roots = [str(Path.home() / ".local/bin"), "/opt/homebrew/bin",
+                 "/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin"]
+        roots.extend(os.get_exec_path())
+        self.tool_path = ":".join(dict.fromkeys(
+            str(Path(root).resolve()) for root in roots if root
+            and not Path(root).resolve().is_relative_to(self.workspace)))
+        self.executables = {}
+        for name in ("uv", "git", "ls", "pwd", "head", "tail"):
+            found = shutil.which(name, path=self.tool_path)
+            if found and not Path(found).resolve().is_relative_to(self.workspace):
+                self.executables[name] = str(Path(found).resolve())
+
+    def executable(self, name: str) -> str:
+        """Return a pinned operator executable, refusing workspace executables."""
+        candidate = self.executables.get(name)
+        if candidate is None and Path(name).is_absolute():
+            candidate = str(Path(name).resolve())
+        if (not candidate or Path(candidate).is_relative_to(self.workspace)
+                or not os.access(candidate, os.X_OK)):
+            raise FileNotFoundError(f"Programme introuvable ou non fiable : {name}")
+        return candidate
 
     @property
     def available(self) -> bool:
@@ -113,6 +136,8 @@ class SandboxRunner:
         ]
         for root in sorted(read_roots):
             lines.append(f"(allow file-read* (subpath {json.dumps(root)}))")
+        for executable in self.executables.values():
+            lines.append(f"(allow file-read* (literal {json.dumps(executable)}))")
         for root in (self.workspace, self.scratch):
             lines.append(f"(allow file-write* (subpath {json.dumps(str(root))}))")
         return "\n".join(lines)
@@ -121,24 +146,21 @@ class SandboxRunner:
         """Launch an argument vector with a minimal environment and no shell.
 
         In required mode, refuse execution when Seatbelt is unavailable. Resolve
-        the executable through a fixed trusted path and create a separate process
+        the executable through captured operator locations and create a separate process
         group so cleanup can stop descendants as well as their parent.
         """
         if not arguments:
             raise ValueError("Commande vide.")
         if self.mode == "required" and not self.available:
             raise RuntimeError("Sandbox macOS indisponible : exécution refusée.")
-        trusted_path = "/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin"
-        executable = shutil.which(arguments[0], path=trusted_path)
-        if not executable:
-            raise FileNotFoundError(f"Programme introuvable : {arguments[0]}")
+        executable = self.executable(arguments[0])
         command = [executable, *arguments[1:]]
         if self.mode == "required":
             command = ["/usr/bin/sandbox-exec", "-p", self.profile(), *command]
         # Build a minimal environment instead of inheriting credentials, user
         # configuration, or caches. Redirect child writes into private scratch.
         environment = {
-            "PATH": trusted_path,
+            "PATH": self.tool_path,
             "HOME": str(self.scratch),
             "TMPDIR": str(self.scratch),
             "UV_CACHE_DIR": str(self.scratch / "uv-cache"),

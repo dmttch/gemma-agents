@@ -18,3 +18,8 @@ storage/
 *.db-shm
 *.db-wal
 .env
+docs/_build/
+.coverage
+coverage.xml
+htmlcov/
+*.backup

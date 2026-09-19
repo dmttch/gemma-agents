@@ -5,13 +5,15 @@ import math
 from pathlib import Path
 from uuid import uuid4
 
+from gemma_agents.contracts import EmbeddingModel
 from gemma_agents.memory.database import Database, now_iso
 
 
 class SemanticMemory:
     """Persist facts and retrieve them by cosine similarity within one workspace."""
 
-    def __init__(self, database: Database, workspace: Path, llm, model: str):
+    def __init__(self, database: Database, workspace: Path,
+                 llm: EmbeddingModel, model: str):
         """Bind memory storage, workspace identity, and the embedding model."""
         self.database = database
         self.workspace = str(workspace.resolve())

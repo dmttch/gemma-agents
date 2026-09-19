@@ -32,6 +32,17 @@ class OllamaLLM:
         response = self.client.embed(model=model, input=content, truncate=False)
         return response.embeddings[0]
 
+    def validate_model(self, model: str) -> None:
+        """Require an installed model advertising tool support, without downloading."""
+        if not model:
+            raise ValueError("Choisis un modèle : gemma-agents setup ou AGENT_MODEL.")
+        installed = {item.model for item in self.client.list().models}
+        if model not in installed:
+            raise ValueError(f"Modèle absent : {model}. Lance gemma-agents setup.")
+        details = self.client.show(model)
+        if "tools" not in (details.capabilities or []):
+            raise ValueError(f"Le modèle {model} ne déclare pas le support des outils.")
+
     def close(self) -> None:
         """Close the HTTP client underlying the Ollama connection."""
         self.client._client.close()

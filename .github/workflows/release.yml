@@ -1,0 +1,29 @@
+name: Prepare release artifacts
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  package:
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9 # v7
+        with:
+          version: "0.12.15"
+          python-version: "3.14"
+      - run: uv sync --locked --group docs
+      - run: uv run --locked ruff check src tests examples scripts docs/conf.py
+      - run: uv run --locked pytest -q
+      - run: uv run --locked --group docs sphinx-build -W --keep-going -b html docs docs/_build/html
+      - run: uv build
+      - run: uv run --locked scripts/smoke_wheel.py dist/*.whl
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-candidate
+          path: |
+            dist
+            docs/_build/html
+            docs/evidence
+          if-no-files-found: error

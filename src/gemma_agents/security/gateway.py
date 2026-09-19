@@ -5,6 +5,7 @@ from gemma_agents.project import ProjectTools
 from gemma_agents.security.approvals import Approver
 from gemma_agents.security.policy import SecurityPolicy
 from gemma_agents.tools.registry import ToolRegistry
+from gemma_agents.tools.results import ToolFailure
 
 
 class ToolGateway:
@@ -57,8 +58,9 @@ class ToolGateway:
                 outcome = "denied"
                 result = "ACTION REFUSÉE : approbation humaine absente ou refusée."
             else:
-                result = str(self.registry.execute(name, arguments))
-                outcome = "executed"
+                value = self.registry.execute(name, arguments)
+                outcome = "error" if isinstance(value, ToolFailure) else "executed"
+                result = str(value)
         except Exception as error:
             result = f"ERREUR OUTIL : {type(error).__name__}: {error}"
         # Denials remain sticky for the turn; a corrected successful invocation

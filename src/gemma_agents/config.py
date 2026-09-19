@@ -1,6 +1,7 @@
 """Load and validate runtime settings and workspace/storage boundaries."""
 
 import os
+import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -29,7 +30,7 @@ class Settings:
     repair_attempts: int = 2
 
     @classmethod
-    def from_env(cls) -> "Settings":
+    def from_env(cls, *, workspace: Path | None = None) -> "Settings":
         """Load environment overrides, resolve paths, and prepare runtime directories.
         """
         # Keep existing installations on their original database location.
@@ -40,9 +41,12 @@ class Settings:
         )
         storage = Path(os.getenv("AGENT_STORAGE", default_storage))
         storage = storage.expanduser().resolve()
-        workspace = Path(os.getenv("AGENT_WORKSPACE", Path.cwd() / "workspace"))
+        config = storage / "config.toml"
+        saved = tomllib.loads(config.read_text()) if config.exists() else {}
+        workspace = workspace or Path(
+            os.getenv("AGENT_WORKSPACE", Path.cwd() / "workspace"))
         settings = cls(
-            model=os.getenv("AGENT_MODEL", "gemma4:12b-mlx"),
+            model=os.getenv("AGENT_MODEL", saved.get("model", "")),
             ollama_host=os.getenv("OLLAMA_HOST", "http://localhost:11434"),
             workspace=workspace.expanduser().resolve(),
             storage_dir=storage,
@@ -71,6 +75,8 @@ class Settings:
         """
         if self.sandbox not in {"required", "off"}:
             raise ValueError("AGENT_SANDBOX doit valoir required ou off.")
+        if not isinstance(self.model, str):
+            raise ValueError("Le modèle doit être un nom textuel.")
         if min(self.max_agent_steps, self.command_timeout) < 1:
             raise ValueError("Les limites doivent être positives.")
         if self.context_chars < 4000:
@@ -81,10 +87,11 @@ class Settings:
         if self.skills_dir:
             protected.append(self.skills_dir)
         for path in protected:
-            if path.resolve().is_relative_to(self.workspace.resolve()):
+            if (path.resolve().is_relative_to(self.workspace.resolve())
+                    or self.workspace.resolve().is_relative_to(path.resolve())):
                 raise ValueError(
                     "Le workspace doit être distinct du code du runtime, "
                     "du stockage et des skills de confiance."
                 )
         self.workspace.mkdir(parents=True, exist_ok=True)
-        self.storage_dir.mkdir(parents=True, exist_ok=True)
+        self.storage_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
