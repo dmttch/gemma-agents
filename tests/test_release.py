@@ -21,29 +21,6 @@ from gemma_agents.runtime import Runtime
 from gemma_agents.storage import Retention, inspect_database, restore, snapshot
 
 
-def test_model_file_view_decodes_json_once_and_preserves_history(settings):
-    """The model sees literal quotes/CRLF/backslashes, while storage keeps JSON."""
-    from copy import deepcopy
-
-    from gemma_agents.agent.context import ContextBuilder
-
-    literal = 'def f():\r\n    """Docstring."""\r\n    return r"\\n"\r\n'
-    encoded = json.dumps({"path": "sample.py", "start_line": 1, "end_line": 3,
-                          "content": literal, "truncated": False,
-                          "partial_line": False})
-    history = [{"role": "user", "content": "Read sample.py"},
-               response(tools=[("read_file", {"path": "sample.py"})])
-               .message.model_dump(exclude_none=True),
-               {"role": "tool", "tool_name": "read_file", "content": encoded}]
-    original = deepcopy(history)
-    builder = ContextBuilder(settings.system_prompt_path, settings.workspace)
-    messages = builder.build(history)
-    assert messages[-1]["content"].endswith(literal)
-    assert history == original
-    for invalid in ('ACTION REFUSÉE', '[]', '{"content": 42}'):
-        assert builder.file_excerpt(invalid) == invalid
-
-
 def test_denied_action_still_reports_the_operator_checks(settings):
     """A refusal keeps the task blocked without hiding the observed check result."""
     llm = FakeLLM([response(tools=[("run_command", {"command": "uv run pytest"})]),

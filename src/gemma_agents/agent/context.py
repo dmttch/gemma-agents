@@ -54,9 +54,7 @@ class ContextBuilder:
     def build(self, history: list[dict]) -> list[dict]:
         """Build model messages without changing the persisted conversation.
 
-        File excerpts are decoded once for the model, without changing stored
-        JSON or literal backslashes in the file. Outputs may be clipped and
-        older turns omitted. With a database,
+        Tool outputs may be clipped and older turns omitted. With a database,
         completed batches in the current turn can also become historical notes.
         Raise ContextLimitError if the retained messages still exceed the budget.
         """
@@ -74,9 +72,6 @@ class ContextBuilder:
         for message in history:
             if message["role"] == "tool":
                 content = message.get("content", "")
-                if message.get("tool_name") == "read_file":
-                    content = self.file_excerpt(content)
-                    message["content"] = content
                 if len(content) > tool_limit:
                     message["content"] = content[:tool_limit] + (
                         "\n[Extrait; résultat intégral dans l'historique. "
@@ -138,23 +133,3 @@ class ContextBuilder:
                    "compacted": len(compacted), "clipped": clipped,
                    "history_messages": len(original)})
         return messages
-
-    @staticmethod
-    def file_excerpt(content: str) -> str:
-        """Separate navigation metadata from literal file text in the model view.
-
-        Keep the file's quotes, backslashes and line endings unchanged. Errors
-        and legacy plain-text results pass through. Never interpret escapes a
-        second time: a Python string literal may intentionally contain them.
-        """
-        try:
-            data = json.loads(content)
-            if not isinstance(data, dict) or not isinstance(data.get("content"), str):
-                return content
-            metadata = {key: data[key] for key in
-                        ("path", "start_line", "end_line", "truncated", "partial_line")}
-        except (ValueError, KeyError, TypeError):
-            return content
-        return ("Métadonnées de lecture : " + json.dumps(metadata, ensure_ascii=False)
-                + "\nContenu littéral du fichier (sans échappement JSON ajouté) :\n"
-                + data["content"])

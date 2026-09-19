@@ -9,6 +9,10 @@
 - Migrations SQLite ordonnées avec sauvegarde préalable et refus des schémas futurs.
 - Sauvegarde/restauration, révocation des permissions restaurées et maintenance des sessions/audits.
 - Résultats d'outils distinguant explicitement un échec métier d'un succès.
+- Consigne de tâche annonçant l'exécution automatique des critères par le runtime.
+- Budget d'étapes par défaut porté à 40, afin qu'une correction puisse aboutir.
+- Validations et corrections maintenues après une action refusée, le statut
+  `blocked` restant attaché à la tâche.
 - Contrats de modèles injectables, tests de concurrence et récupération.
 - Documentation Sphinx, référence CLI/Python et configuration Read the Docs.
 - CI, installation du wheel en environnement propre et évaluations répétées.

@@ -9,7 +9,7 @@
 | `AGENT_STORAGE` | ancien stockage V1 s'il existe, sinon `~/.local/share/gemma-agents` |
 | `AGENT_SKILLS` | `$AGENT_STORAGE/skills` |
 | `AGENT_EMBEDDING_MODEL` | `embeddinggemma` |
-| `AGENT_MAX_STEPS` | `20`, partagés avec les corrections automatiques |
+| `AGENT_MAX_STEPS` | `40`, partagés avec les corrections automatiques |
 | `AGENT_REPAIR_ATTEMPTS` | `2` |
 | `AGENT_COMMAND_TIMEOUT` | `120` secondes |
 | `AGENT_KEEP_ALIVE` | `15m` |

@@ -18,7 +18,7 @@ class Settings:
     storage_dir: Path
     database_path: Path
     system_prompt_path: Path
-    max_agent_steps: int = 20
+    max_agent_steps: int = 40
     command_timeout: int = 120
     keep_alive: str = "15m"
     embedding_model: str = "embeddinggemma"
@@ -52,7 +52,7 @@ class Settings:
             storage_dir=storage,
             database_path=storage / "agent.db",
             system_prompt_path=BASE_DIR / "prompts/system.md",
-            max_agent_steps=int(os.getenv("AGENT_MAX_STEPS", "20")),
+            max_agent_steps=int(os.getenv("AGENT_MAX_STEPS", "40")),
             command_timeout=int(os.getenv("AGENT_COMMAND_TIMEOUT", "120")),
             keep_alive=os.getenv("AGENT_KEEP_ALIVE", "15m"),
             embedding_model=os.getenv("AGENT_EMBEDDING_MODEL", "embeddinggemma"),
