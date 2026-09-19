@@ -48,7 +48,8 @@ def test_denied_action_still_reports_the_operator_checks(settings):
     """A refusal keeps the task blocked without hiding the observed check result."""
     llm = FakeLLM([response(tools=[("run_command", {"command": "uv run pytest"})]),
                    response("Les tests ont réussi.")])
-    with Runtime(replace(settings, repair_attempts=2), llm) as runtime:
+    # No repair attempt here: the check outcome alone must reach the operator.
+    with Runtime(settings, llm) as runtime:
         runtime.runner.run = Mock(return_value="EXIT CODE: 1\nassert 1 == 2")
         task = runtime.tasks.create("Corrige", ["uv run pytest -q"])
         runtime.permissions.grant("task", task, "uv run pytest -q")
@@ -59,8 +60,32 @@ def test_denied_action_still_reports_the_operator_checks(settings):
         assert runtime.tasks.get(task)["status"] == "blocked"
         assert runtime.verifications(result.session_id).list()[0]["status"] == "failed"
         assert runtime.runner.run.call_count == 1
-        assert not [event for event in events if event["type"] == "repair"]
         assert len(llm.calls) == 2
+
+
+def test_refusal_keeps_a_repaired_task_blocked(settings):
+    """Repair the project after a refusal, then keep the refusal in the final status."""
+    llm = FakeLLM([response(tools=[("run_command", {"command": "ls"})]),
+                   response("Fini"),
+                   response(tools=[("write_file", {"path": "calc.py",
+                                                   "content": "fixed"})]),
+                   response("Corrigé")])
+    with Runtime(replace(settings, repair_attempts=2), llm) as runtime:
+        def run(arguments, timeout):
+            """Pass only once the scripted repair has created the missing file."""
+            return ("EXIT CODE: 0\npassed"
+                    if (settings.workspace / "calc.py").exists()
+                    else "EXIT CODE: 1\nwrong answer")
+
+        runtime.runner.run = run
+        task = runtime.tasks.create("Corrige", ["uv run pytest"])
+        runtime.permissions.grant("task", task, "uv run pytest")
+        events = []
+        result = runtime.run_task(task, emit=events.append)
+        # The repair ran and the checks now pass, but the refusal is not erased.
+        assert (result.status, result.verification) == ("blocked", "passed")
+        assert len([e for e in events if e["type"] == "repair"]) == 1
+        assert len([e for e in events if e["type"] == "final"]) == 1
 
 
 def test_workspace_lock_cross_process_and_storage_independent(settings):

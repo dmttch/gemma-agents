@@ -293,10 +293,11 @@ class Runtime:
         """Claim a task, run it, and evaluate its fixed verification commands.
 
         Repairs share the original step budget and stop on repeated failure or
-        unchanged workspace content. A refused action keeps the task blocked
-        but no longer cancels the checks: they are still executed once and
-        reported, without repair attempts. Persist the outcome, emit a final
-        event after checks, and close processes owned by the task session on exit.
+        unchanged workspace content. A refused action neither cancels the checks
+        nor the repairs of the project code; it keeps the task blocked until the
+        operator inspects it, even when a later attempt passes. Persist the
+        outcome, emit a final event after checks, and close processes owned by
+        the task session on exit.
         """
         if not self.lock.acquire(blocking=False):
             raise RuntimeBusyError("Un tour est déjà en cours dans ce runtime.")
@@ -335,6 +336,7 @@ class Runtime:
                 prompt = self.project.expand_references(prompt)
                 remaining = self.settings.max_agent_steps
                 previous_failure = None
+                denied = False
                 for attempt in range(self.settings.repair_attempts + 1):
                     control.boundary()
                     result = self._run(session_id, prompt, approver, task_emit,
@@ -343,7 +345,9 @@ class Runtime:
                     # A denial during the turn never cancels the operator's own
                     # checks: they carry their own grant and their observed
                     # outcome is the only evidence about the workspace state.
-                    denied_turn = result.status == "blocked"
+                    # A refusal stays attached to the task even if a later
+                    # repair attempt finishes without one.
+                    denied = denied or result.status == "blocked"
                     if not checks or result.status not in {"completed", "blocked"}:
                         if checks:
                             result.verification = "not_run"
@@ -371,7 +375,7 @@ class Runtime:
                     if gateway.blocked:
                         result.status = "blocked"
                         result.verification = "blocked"
-                    elif denied_turn:
+                    elif denied:
                         # Keep the refusal visible; passing checks do not prove
                         # that the action the model was denied was unnecessary.
                         result.status = "blocked"
@@ -385,7 +389,7 @@ class Runtime:
                     # Stop futile repairs on unchanged files or repeated evidence.
                     # None means hashing was incomplete, not an unchanged project.
                     failure = (fingerprint, tuple(outputs))
-                    if (passed or denied_turn or gateway.blocked or remaining < 1
+                    if (passed or gateway.blocked or remaining < 1
                             or attempt == self.settings.repair_attempts
                             or (previous_failure is not None and fingerprint is not None
                                 and fingerprint == previous_failure[0])

@@ -243,10 +243,12 @@ approbation et une permission absentes `blocked`. Le résultat expose
 `verification` (`passed`, `failed`, `blocked`, `not_run` ou `not_requested`).
 
 Un refus subi **pendant** le tour du modèle laisse la tâche `blocked` : le statut
-conserve la trace de l'action interdite. Vos critères sont malgré tout exécutés
-une fois, avec leur permission propre, et leur résultat observé est rapporté dans
-`verification`. Aucune correction automatique n'est tentée dans ce cas, parce que
-la cause du blocage relève d'une décision d'autorisation, pas du code du projet.
+conserve la trace de l'action interdite, y compris si une correction ultérieure
+aboutit. Vos critères sont malgré tout exécutés, avec leur permission propre, et
+les corrections automatiques restent possibles, puisqu'elles portent sur le code
+du projet. Le résultat observé apparaît alors dans `verification` : un couple
+`blocked` / `passed` signifie que les commandes demandées ont réussi, mais qu'une
+action a été refusée en chemin et mérite votre inspection.
 Sans critères, `completed` signifie seulement que le tour du modèle est terminé.
 Les checks planifiés nécessitent une permission explicite pour passer sans approbateur.
 
