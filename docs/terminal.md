@@ -110,9 +110,10 @@ continue de refuser les actions sensibles.
 Après échec des checks déclarés, le runtime transmet les erreurs au modèle,
 puis relance les mêmes commandes. `AGENT_REPAIR_ATTEMPTS` limite les corrections
 supplémentaires (2 par défaut, de 0 à 5). Les tours de correction partagent le
-budget initial de `AGENT_MAX_STEPS`. Les refus ne déclenchent pas de correction
-automatique, et une nouvelle validation en échec sans changement du projet arrête
-la boucle. Trois appels d'outil identiques consécutifs arrêtent aussi le tour avant
+budget initial de `AGENT_MAX_STEPS` : une valeur trop basse épuise le budget avant
+qu'une correction aboutisse, et la tâche se termine en `limited`. Un refus n'empêche
+pas la correction, puisqu'elle porte sur le code du projet, et une nouvelle
+validation en échec sans changement du projet arrête la boucle. Trois appels d'outil identiques consécutifs arrêtent aussi le tour avant
 la troisième exécution. Un appel invalide corrigé avec succès ne bloque plus à lui
 seul la conclusion du tour.
 
@@ -203,8 +204,9 @@ brutal reste visible comme exécution inachevée à la prochaine ouverture.
 partir de 1 ; 200 lignes par défaut, au plus 500). Les résultats sont bornés pour
 éviter de remplir le contexte avec un fichier entier. Le résultat destiné au modèle
 sépare le contenu brut et les métadonnées de navigation en JSON, pour éviter de
-recopier accidentellement des numéros de ligne. Les espaces et fins de ligne du
-contenu sont préservés ; `partial_line` signale une ligne coupée par la limite.
+recopier accidentellement des numéros de ligne ou du texte d'accompagnement. Les
+espaces et fins de ligne du contenu sont préservés ; `partial_line` signale une
+ligne coupée par la limite.
 
 Les outils `write_file`, `replace_text` et `apply_patch` enregistrent les contenus
 avant/après dans SQLite et écrivent par remplacement atomique. `apply_patch`
@@ -231,10 +233,21 @@ gemma-agents tasks add "Corrige le parseur CSV" \
 gemma-agents tasks run IDENTIFIANT
 ```
 
-Ces commandes sont exécutées après la conclusion du modèle. Après épuisement des
+Ces commandes sont exécutées après la conclusion du modèle. La consigne de tâche
+l'annonce explicitement : le modèle termine ses modifications, rend la main, puis
+reçoit les erreurs observées pour correction, au lieu de relancer lui-même des
+commandes équivalentes. Après épuisement des
 corrections autorisées, un code non nul ou un timeout entraîne `failed`, une
 approbation et une permission absentes `blocked`. Le résultat expose
 `verification` (`passed`, `failed`, `blocked`, `not_run` ou `not_requested`).
+
+Un refus subi **pendant** le tour du modèle laisse la tâche `blocked` : le statut
+conserve la trace de l'action interdite, y compris si une correction ultérieure
+aboutit. Vos critères sont malgré tout exécutés, avec leur permission propre, et
+les corrections automatiques restent possibles, puisqu'elles portent sur le code
+du projet. Le résultat observé apparaît alors dans `verification` : un couple
+`blocked` / `passed` signifie que les commandes demandées ont réussi, mais qu'une
+action a été refusée en chemin et mérite votre inspection.
 Sans critères, `completed` signifie seulement que le tour du modèle est terminé.
 Les checks planifiés nécessitent une permission explicite pour passer sans approbateur.
 

@@ -293,8 +293,11 @@ class Runtime:
         """Claim a task, run it, and evaluate its fixed verification commands.
 
         Repairs share the original step budget and stop on repeated failure or
-        unchanged workspace content. Persist the outcome, emit a final event
-        after checks, and close processes owned by the task session on exit.
+        unchanged workspace content. A refused action neither cancels the checks
+        nor the repairs of the project code; it keeps the task blocked until the
+        operator inspects it, even when a later attempt passes. Persist the
+        outcome, emit a final event after checks, and close processes owned by
+        the task session on exit.
         """
         if not self.lock.acquire(blocking=False):
             raise RuntimeBusyError("Un tour est déjà en cours dans ce runtime.")
@@ -314,7 +317,13 @@ class Runtime:
                               + prompt)
                 checks = self.tasks.checks(task_id)
                 if checks:
-                    prompt += "\nCritères de validation : " + json.dumps(checks)
+                    prompt += ("\nLe runtime exécutera automatiquement ces commandes "
+                               "exactes après ta réponse finale et te rendra leurs "
+                               "erreurs pour correction. Termine les modifications "
+                               "puis rends la main pour cette validation ; inutile "
+                               "de lancer des commandes supplémentaires. Ne déclare "
+                               "pas les tests réussis avant leurs résultats.\n"
+                               "Critères de validation : " + json.dumps(checks))
 
                 def task_emit(event):
                     """Forward task progress while withholding the final event until
@@ -327,12 +336,19 @@ class Runtime:
                 prompt = self.project.expand_references(prompt)
                 remaining = self.settings.max_agent_steps
                 previous_failure = None
+                denied = False
                 for attempt in range(self.settings.repair_attempts + 1):
                     control.boundary()
                     result = self._run(session_id, prompt, approver, task_emit,
                                        control, remaining)
                     remaining -= result.steps
-                    if not checks or result.status != "completed":
+                    # A denial during the turn never cancels the operator's own
+                    # checks: they carry their own grant and their observed
+                    # outcome is the only evidence about the workspace state.
+                    # A refusal stays attached to the task even if a later
+                    # repair attempt finishes without one.
+                    denied = denied or result.status == "blocked"
+                    if not checks or result.status not in {"completed", "blocked"}:
                         if checks:
                             result.verification = "not_run"
                         break
@@ -359,6 +375,10 @@ class Runtime:
                     if gateway.blocked:
                         result.status = "blocked"
                         result.verification = "blocked"
+                    elif denied:
+                        # Keep the refusal visible; passing checks do not prove
+                        # that the action the model was denied was unnecessary.
+                        result.status = "blocked"
                     elif not passed:
                         result.status = "failed"
                     result.content += "\n\nVérifications demandées : " + (

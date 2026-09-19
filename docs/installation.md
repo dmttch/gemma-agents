@@ -37,7 +37,7 @@ prérequis obligatoire manque ; la présence du binaire `sandbox-exec` ne suffit
 
 ```sh
 uv build
-uv tool install --python 3.14 ./dist/gemma_agents-0.4.0-py3-none-any.whl
+uv tool install --python 3.14 ./dist/gemma_agents-1.0.0-py3-none-any.whl
 gemma-agents --version
 gemma-agents setup
 gemma-agents doctor
