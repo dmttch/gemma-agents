@@ -44,6 +44,25 @@ def test_model_file_view_decodes_json_once_and_preserves_history(settings):
         assert builder.file_excerpt(invalid) == invalid
 
 
+def test_denied_action_still_reports_the_operator_checks(settings):
+    """A refusal keeps the task blocked without hiding the observed check result."""
+    llm = FakeLLM([response(tools=[("run_command", {"command": "uv run pytest"})]),
+                   response("Les tests ont réussi.")])
+    with Runtime(replace(settings, repair_attempts=2), llm) as runtime:
+        runtime.runner.run = Mock(return_value="EXIT CODE: 1\nassert 1 == 2")
+        task = runtime.tasks.create("Corrige", ["uv run pytest -q"])
+        runtime.permissions.grant("task", task, "uv run pytest -q")
+        events = []
+        result = runtime.run_task(task, emit=events.append)
+        # The denied command stays visible, yet the granted check still ran once.
+        assert (result.status, result.verification) == ("blocked", "failed")
+        assert runtime.tasks.get(task)["status"] == "blocked"
+        assert runtime.verifications(result.session_id).list()[0]["status"] == "failed"
+        assert runtime.runner.run.call_count == 1
+        assert not [event for event in events if event["type"] == "repair"]
+        assert len(llm.calls) == 2
+
+
 def test_workspace_lock_cross_process_and_storage_independent(settings):
     """Separate processes/storage roots cannot share a workspace; close releases it."""
     with Runtime(settings, FakeLLM()):

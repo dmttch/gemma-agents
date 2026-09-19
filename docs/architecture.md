@@ -62,7 +62,10 @@ enregistré avant de restaurer. Les commandes et Git ne sont pas annulables par 
 `completed` sans checks n'est pas une preuve fonctionnelle. Une `ToolFailure`
 conserve un message textuel exploitable sans transformer un refus métier en
 succès d'exécution. Les erreurs corrigées d'un outil peuvent être levées après un
-appel réussi ; une approbation refusée reste bloquante pour le tour.
+appel réussi ; une approbation refusée reste bloquante pour le tour. Ce blocage
+n'annule pas les validations fixées par l'opérateur : elles conservent leur
+permission propre, s'exécutent une fois et leur résultat observé est rapporté
+sans transformer le tour bloqué en succès.
 
 Les modules Python documentés dans la référence sont des API internes. Pour
 intégrer le produit, privilégiez la CLI ou l'API HTTP. Une modification de ces

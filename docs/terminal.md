@@ -241,6 +241,12 @@ commandes équivalentes. Après épuisement des
 corrections autorisées, un code non nul ou un timeout entraîne `failed`, une
 approbation et une permission absentes `blocked`. Le résultat expose
 `verification` (`passed`, `failed`, `blocked`, `not_run` ou `not_requested`).
+
+Un refus subi **pendant** le tour du modèle laisse la tâche `blocked` : le statut
+conserve la trace de l'action interdite. Vos critères sont malgré tout exécutés
+une fois, avec leur permission propre, et leur résultat observé est rapporté dans
+`verification`. Aucune correction automatique n'est tentée dans ce cas, parce que
+la cause du blocage relève d'une décision d'autorisation, pas du code du projet.
 Sans critères, `completed` signifie seulement que le tour du modèle est terminé.
 Les checks planifiés nécessitent une permission explicite pour passer sans approbateur.
 
