@@ -1,0 +1,44 @@
+[project]
+name = "gemma-agents"
+version = "0.4.0"
+description = "Agent local Ollama : mémoire, skills, tâches et outils contrôlés"
+readme = "README.md"
+authors = [
+    { name = "dmttch", email = "dmttch@proton.me" }
+]
+requires-python = ">=3.14.3"
+dependencies = [
+    "click>=8.5.0",
+    "croniter>=6.2.4",
+    "fastapi>=0.141.1",
+    "httpx>=0.28.1",
+    "ollama>=0.6.2",
+    "pathspec>=1.1.1",
+    "prompt-toolkit>=3.0.53",
+    "pydantic>=2.13.5",
+    "rich>=15.0.0",
+    "rich-click>=1.9.9",
+    "uvicorn[standard]>=0.53.0",
+]
+
+[project.scripts]
+gemma-agents = "gemma_agents.main:main"
+
+[build-system]
+requires = ["uv_build>=0.12.15,<0.13.0"]
+build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "ruff>=0.16.8",
+]
