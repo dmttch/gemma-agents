@@ -102,7 +102,8 @@ class FileSystemTools:
             end_line: Last line, inclusive; at most 500 lines per call.
 
         Returns:
-            JSON: content is the exact excerpt, separate from navigation metadata.
+            Navigation metadata, then the excerpt exactly as stored in the file:
+            quotes, backslashes and line endings are never escaped a second time.
         """
 
         file_path = self._safe_path(path)

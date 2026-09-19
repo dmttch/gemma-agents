@@ -314,7 +314,13 @@ class Runtime:
                               + prompt)
                 checks = self.tasks.checks(task_id)
                 if checks:
-                    prompt += "\nCritères de validation : " + json.dumps(checks)
+                    prompt += ("\nLe runtime exécutera automatiquement ces commandes "
+                               "exactes après ta réponse finale et te rendra leurs "
+                               "erreurs pour correction. Termine les modifications "
+                               "puis rends la main pour cette validation ; inutile "
+                               "de lancer des commandes supplémentaires. Ne déclare "
+                               "pas les tests réussis avant leurs résultats.\n"
+                               "Critères de validation : " + json.dumps(checks))
 
                 def task_emit(event):
                     """Forward task progress while withholding the final event until

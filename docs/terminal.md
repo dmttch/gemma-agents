@@ -201,10 +201,13 @@ brutal reste visible comme exécution inachevée à la prochaine ouverture.
 
 `read_file` accepte `start_line` et `end_line` (lignes inclusives, numérotées à
 partir de 1 ; 200 lignes par défaut, au plus 500). Les résultats sont bornés pour
-éviter de remplir le contexte avec un fichier entier. Le résultat destiné au modèle
-sépare le contenu brut et les métadonnées de navigation en JSON, pour éviter de
-recopier accidentellement des numéros de ligne. Les espaces et fins de ligne du
-contenu sont préservés ; `partial_line` signale une ligne coupée par la limite.
+éviter de remplir le contexte avec un fichier entier. Le résultat enregistré est
+un objet JSON qui sépare le contenu brut des métadonnées de navigation, pour éviter
+de recopier accidentellement des numéros de ligne. La vue transmise au modèle décode
+ce JSON une seule fois : elle annonce les métadonnées, puis le texte littéral du
+fichier. Un guillemet ou un antislash du fichier reste donc tel quel au lieu
+d'apparaître échappé. Les espaces et fins de ligne du contenu sont préservés ;
+`partial_line` signale une ligne coupée par la limite.
 
 Les outils `write_file`, `replace_text` et `apply_patch` enregistrent les contenus
 avant/après dans SQLite et écrivent par remplacement atomique. `apply_patch`
@@ -231,7 +234,10 @@ gemma-agents tasks add "Corrige le parseur CSV" \
 gemma-agents tasks run IDENTIFIANT
 ```
 
-Ces commandes sont exécutées après la conclusion du modèle. Après épuisement des
+Ces commandes sont exécutées après la conclusion du modèle. La consigne de tâche
+l'annonce explicitement : le modèle termine ses modifications, rend la main, puis
+reçoit les erreurs observées pour correction, au lieu de relancer lui-même des
+commandes équivalentes. Après épuisement des
 corrections autorisées, un code non nul ou un timeout entraîne `failed`, une
 approbation et une permission absentes `blocked`. Le résultat expose
 `verification` (`passed`, `failed`, `blocked`, `not_run` ou `not_requested`).
