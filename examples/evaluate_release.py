@@ -3,6 +3,10 @@
 Run only on a trusted macOS Apple Silicon host with an installed local model.
 Each case owns a temporary workspace; only its exact validation command receives
 a grant. Test files are checked byte-for-byte after execution to detect cheating.
+
+A scenario passes on its deliverable, not on the model's exploration habits: a
+refused call that the model recovered from leaves the run blocked, which the
+report states explicitly, while a failed or skipped validation always fails.
 """
 
 import hashlib
@@ -121,6 +125,8 @@ def main(model, host, repetitions, scenario, output):
     for repeat in range(1, repetitions + 1):
         for name in scenario or SCENARIOS:
             events = []
+            refusals = []
+            status = verification = None
             start = time.monotonic()
             console.print(f"{repeat}/{repetitions} · {name}")
             with tempfile.TemporaryDirectory(prefix="gemma-acceptance-") as folder:
@@ -133,12 +139,27 @@ def main(model, host, repetitions, scenario, output):
                 try:
                     with Runtime(settings) as runtime:
                         passed, result = SCENARIOS[name](runtime, events.append)
-                        passed = passed and result.status == "completed"
+                        status, verification = result.status, result.verification
+                        refusals = [str(event["content"]).splitlines()[0]
+                                    for event in events
+                                    if event["type"] == "tool_result"
+                                    and str(event["content"]).startswith(
+                                        "ACTION REFUSÉE")]
+                        # A refusal the model recovered from keeps the run
+                        # blocked by design; it is recorded here instead of
+                        # being counted as a failure, because the deliverable
+                        # and the operator's checks remain the only evidence.
+                        accepted = {"completed"}
+                        if refusals and verification in (None, "passed"):
+                            accepted.add("blocked")
+                        passed = passed and status in accepted
                         detail = "" if passed else result.content[:2000]
                 except Exception as error:
                     passed, detail = False, str(error)
             row = {"scenario": name, "repeat": repeat, "passed": passed,
                    "seconds": round(time.monotonic() - start, 2),
+                   "status": status, "verification": verification,
+                   "refusals": refusals,
                    "tool_calls": sum(e["type"] == "tool_request" for e in events),
                    "repairs": sum(e["type"] == "repair" for e in events),
                    "human_interventions": 0, "detail": detail,

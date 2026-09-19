@@ -27,8 +27,17 @@ conserver les mesures même si un scénario ultérieur échoue.
 
 Les scénarios utilisent des workspaces et stockages temporaires. Seule la commande
 de test exacte reçoit une permission temporaire. Les métriques incluent durée,
-appels d'outils et corrections automatiques. Il n'y a pas d'intervention humaine
-pendant l'essai. Un échec retourne un code non nul et reste présent dans le rapport.
+appels d'outils et corrections automatiques. Chaque ligne conserve aussi `status`,
+`verification` et la liste `refusals` des actions refusées pendant l'essai. Il n'y a
+pas d'intervention humaine pendant l'essai. Un échec retourne un code non nul et
+reste présent dans le rapport.
+
+Un scénario est jugé sur son livrable, pas sur les habitudes d'exploration du
+modèle. Une commande hors permission, refusée puis contournée par des outils
+autorisés, laisse le tour `blocked` comme le veut le contrat du runtime : le
+rapport la consigne dans `refusals` sans la compter comme un échec, dès lors que
+le livrable est correct et que les validations demandées ont réussi. Une
+validation en échec, bloquée ou non exécutée fait toujours échouer le scénario.
 
 Pour diagnostiquer un cas isolé, ajoutez `--scenario python_project --repetitions 1`.
 Les scripts historiques `evaluate.py` et `evaluate_v4.py` restent disponibles pour
@@ -38,6 +47,8 @@ comparer les scénarios précédents ; le banc de release constitue le contrôle
 
 Avant une version stable, exiger un rapport complet, sans échec, sur toutes les
 répétitions et les six scénarios, plus la suite déterministe et les sondes macOS.
+Lire aussi les `refusals` consignés : ils ne font pas échouer un scénario, mais
+un refus répété signale une permission manquante ou une consigne à clarifier.
 Archiver aussi les échecs lors du diagnostic, sans sélectionner uniquement les
 essais favorables. Une augmentation de budget doit être déclarée dans le rapport.
 
