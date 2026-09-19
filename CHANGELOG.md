@@ -1,6 +1,9 @@
 # Changelog
 
-## Non publié — préparation de la version 1.0
+## 1.0.0 — 2026-09-19
+
+Première version stable, qualifiée sur macOS Apple Silicon et non publiée :
+ni tag, ni paquet PyPI, ni documentation hébergée.
 
 - Verrou interprocessus du workspace et exclusion des restaurations concurrentes.
 - Codes de sortie fiables, mode JSON et diagnostic des prérequis.

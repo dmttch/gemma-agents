@@ -4,10 +4,10 @@ Agent de développement local pour **macOS Apple Silicon**, piloté par un modè
 Ollama installé. Il explore un projet, prépare ou applique des modifications,
 exécute des validations approuvées et conserve les sessions dans SQLite.
 
-**État : préparation de la version 1.0.** Le paquet conserve la version 0.4.0
-pendant la qualification. Les résultats mesurés et les limites sont documentés ;
-la présence d'une CI et d'une configuration Read the Docs ne signifie pas qu'une
-release a déjà été publiée.
+**État : version 1.0.0, qualifiée et non publiée.** Les résultats mesurés et les
+limites sont documentés dans [les rapports de qualification](docs/evidence/index.md).
+La présence d'une CI et d'une configuration Read the Docs ne signifie pas qu'une
+release a déjà été publiée : ni tag, ni paquet PyPI, ni documentation hébergée.
 
 ## Installation
 
@@ -34,7 +34,7 @@ Pour installer le paquet dans un environnement isolé :
 
 ```sh
 uv build
-uv tool install --python 3.14 ./dist/gemma_agents-0.4.0-py3-none-any.whl
+uv tool install --python 3.14 ./dist/gemma_agents-1.0.0-py3-none-any.whl
 gemma-agents setup
 gemma-agents doctor
 ```
@@ -162,7 +162,7 @@ publique n'est annoncée tant que le service n'a pas été raccordé.
 uv run --locked pytest -q
 uv run --locked ruff check src tests examples scripts docs/conf.py
 uv build
-uv run --locked scripts/smoke_wheel.py dist/gemma_agents-0.4.0-py3-none-any.whl
+uv run --locked scripts/smoke_wheel.py dist/gemma_agents-1.0.0-py3-none-any.whl
 uv run --locked examples/evaluate_release.py --model gemma4:12b-mlx \
   --repetitions 3 --output /tmp/gemma-acceptance.json
 ```
