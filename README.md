@@ -1,21 +1,30 @@
 # Gemma Agents
 
+<!-- Versions : .python-version et uv.lock ; contrainte uv_build dans pyproject.toml. -->
+[![Python 3.14.3](https://img.shields.io/badge/Python-3.14.3-3776AB?logo=python&logoColor=white)](https://www.python.org/downloads/release/python-3143/)[![Click 8.5.0](https://img.shields.io/badge/Click-8.5.0-blue)](https://pypi.org/project/click/8.5.0/)[![croniter 6.2.4](https://img.shields.io/badge/croniter-6.2.4-blue)](https://pypi.org/project/croniter/6.2.4/)[![FastAPI 0.141.1](https://img.shields.io/badge/FastAPI-0.141.1-009688?logo=fastapi&logoColor=white)](https://pypi.org/project/fastapi/0.141.1/)[![HTTPX 0.28.1](https://img.shields.io/badge/HTTPX-0.28.1-blue)](https://pypi.org/project/httpx/0.28.1/)[![Ollama 0.6.2](https://img.shields.io/badge/Ollama-0.6.2-000000?logo=ollama&logoColor=white)](https://pypi.org/project/ollama/0.6.2/)[![pathspec 1.1.1](https://img.shields.io/badge/pathspec-1.1.1-blue)](https://pypi.org/project/pathspec/1.1.1/)[![prompt-toolkit 3.0.53](https://img.shields.io/badge/prompt--toolkit-3.0.53-blue)](https://pypi.org/project/prompt-toolkit/3.0.53/)[![Pydantic 2.13.5](https://img.shields.io/badge/Pydantic-2.13.5-E92063?logo=pydantic&logoColor=white)](https://pypi.org/project/pydantic/2.13.5/)[![Rich 15.0.0](https://img.shields.io/badge/Rich-15.0.0-blue)](https://pypi.org/project/rich/15.0.0/)[![rich-click 1.9.9](https://img.shields.io/badge/rich--click-1.9.9-blue)](https://pypi.org/project/rich-click/1.9.9/)[![Uvicorn standard 0.53.0](https://img.shields.io/badge/Uvicorn%5Bstandard%5D-0.53.0-blue)](https://pypi.org/project/uvicorn/0.53.0/)[![pytest 9.1.1](https://img.shields.io/badge/pytest-9.1.1-0A9EDC?logo=pytest&logoColor=white)](https://pypi.org/project/pytest/9.1.1/)[![Ruff 0.16.8](https://img.shields.io/badge/Ruff-0.16.8-D7FF64?logo=ruff&logoColor=black)](https://pypi.org/project/ruff/0.16.8/)[![uv_build >=0.12.15,<0.13.0](https://img.shields.io/static/v1?label=uv_build&message=%3E%3D0.12.15%2C%3C0.13.0&color=DE5FE9&logo=uv&logoColor=white)](https://pypi.org/project/uv-build/)
+[![Documentation](https://readthedocs.org/projects/gemma-agents/badge/?version=latest)](https://gemma-agents.readthedocs.io)
+
 Agent de développement local pour **macOS Apple Silicon**, piloté par un modèle
 Ollama installé. Il explore un projet, prépare ou applique des modifications,
 exécute des validations approuvées et conserve les sessions dans SQLite.
 
-**État : version 1.0.0, qualifiée et non publiée.** Les résultats mesurés et les
-limites sont documentés dans [les rapports de qualification](docs/evidence/index.md).
-La présence d'une CI et d'une configuration Read the Docs ne signifie pas qu'une
-release a déjà été publiée : ni tag, ni paquet PyPI, ni documentation hébergée.
+**[Documentation complète → gemma-agents.readthedocs.io](https://gemma-agents.readthedocs.io)**
 
-## Installation
+## Fonctionnalités
+
+- Interface terminal interactive, streaming et reprise des conversations.
+- Exploration du projet, instructions `AGENTS.md`, skills et mémoire facultative.
+- Éditions journalisées, revue par blocs et annulation avec contrôle des conflits.
+- Plans, tâches persistantes, validations et planification cron.
+- Outils Git contrôlés, permissions expirantes et sandbox macOS.
+- API HTTP/WebSocket locale et sauvegarde/restauration du stockage SQLite.
+
+## Démarrage rapide
 
 Prérequis : macOS Apple Silicon, [uv](https://docs.astral.sh/uv/getting-started/installation/),
 Python ≥ 3.14.3, Git et un serveur [Ollama](https://docs.ollama.com/quickstart)
-local en cours d'exécution. Le modèle choisi doit être installé et déclarer le
-support des outils. Le besoin en RAM dépend du modèle ; aucun modèle n'est téléchargé
-par Gemma Agents.
+local en cours d'exécution, avec un modèle installé prenant en charge les outils.
+Aucun modèle n'est téléchargé par Gemma Agents.
 
 ```sh
 git clone https://github.com/dmttch/gemma-agents.git
@@ -26,156 +35,37 @@ uv run gemma-agents doctor
 uv run gemma-agents
 ```
 
-`setup` vérifie et conserve le choix du modèle. `doctor` contrôle la plateforme,
-les exécutables, le lancement réel du sandbox et la compatibilité du modèle ;
-un prérequis manquant produit un code de sortie non nul.
-
-Pour installer le paquet dans un environnement isolé :
-
-```sh
-uv build
-uv tool install --python 3.14 ./dist/gemma_agents-1.0.0-py3-none-any.whl
-gemma-agents setup
-gemma-agents doctor
-```
-
-Les exemples suivants utilisent cette installation. Depuis les sources, préfixez
-les commandes `gemma-agents` par `uv run`.
-
-## Première utilisation
+`setup` conserve le choix du modèle ; `doctor` vérifie les prérequis et le sandbox.
+Pour lancer une première tâche dans un workspace dédié :
 
 ```sh
 mkdir -p ~/Projects/gemma-demo
-gemma-agents --workspace ~/Projects/gemma-demo run \
+uv run gemma-agents --workspace ~/Projects/gemma-demo run \
   "Crée hello.txt contenant Bonjour, puis relis-le pour vérifier."
 ```
 
-`--workspace`, `--model` et `--json` sont des options globales : elles se placent
-avant la sous-commande. Le workspace par défaut est `./workspace` ; il doit être
-distinct du code du runtime, du stockage et des skills.
+Le workspace par défaut est `./workspace`. Il doit être distinct du code du runtime,
+du stockage et des skills. Les options globales comme `--workspace` se placent avant
+la sous-commande. Dans le terminal interactif, `/help` présente les commandes et
+`/review on` active la revue des éditions avant application.
 
-En mode interactif, `/help` présente les commandes. `/review on` prépare les
-éditions avant application, `/review` permet de sélectionner les changements,
-`/diff` les inspecte et `/undo` annule une édition si le fichier n'a pas changé.
-Ce mode de revue doit être réactivé après redémarrage.
+## Documentation et contribution
 
-Une seule instance peut ouvrir un workspace. Le verrou fonctionne entre terminal,
-worker et serveur, même si leurs stockages diffèrent, et se libère après un crash.
-Les éditeurs et autres programmes ne prennent pas ce verrou.
+La [documentation en ligne](https://gemma-agents.readthedocs.io) regroupe les guides
+d'installation et d'utilisation, la configuration, les références CLI et API,
+la sécurité, la gestion des données, le dépannage et les rapports de qualification.
+Elle décrit aussi l'architecture et les procédures de développement et de validation.
 
-## Tâches vérifiées
+Pour contribuer, consultez [CONTRIBUTING.md](CONTRIBUTING.md).
+Les évolutions sont recensées dans le [changelog](CHANGELOG.md).
 
-Préinstallez les dépendances du projet avec `uv sync --locked` dans votre terminal.
-Les commandes de l'agent sont hors ligne et n'utilisent pas votre cache uv personnel.
+## Sécurité et licence
 
-```sh
-gemma-agents --workspace ~/Projects/mon-projet tasks add \
-  "Corrige le parseur" --check "uv run pytest -q"
-gemma-agents --workspace ~/Projects/mon-projet tasks run IDENTIFIANT
-```
+Le modèle peut modifier les fichiers du workspace et une commande approuvée peut
+les supprimer : conservez vos sauvegardes. Le sandbox macOS repose sur
+`sandbox-exec`, déprécié par Apple ; le projet n'a pas fait l'objet d'un audit de
+sécurité contre du code hostile. L'API locale ne doit pas être exposée à Internet.
+Consultez [SECURITY.md](SECURITY.md) et la documentation avant utilisation.
 
-Remplacez `IDENTIFIANT` par l'identifiant retourné. Les validations sont exécutées
-après la réponse du modèle. Les corrections automatiques partagent le budget du
-tour initial. Sans critères, `completed` signifie seulement que le tour est terminé.
-
-Pour un script :
-
-```sh
-gemma-agents --json --workspace ~/Projects/mon-projet run "Inspecte le projet"
-```
-
-Le résultat JSON va sur stdout, la progression sur stderr. Aucune approbation
-interactive n'est demandée en mode JSON. Les codes principaux sont `0` (terminé),
-`1` (échec), `2` (syntaxe), `3` (bloqué ou occupé), `4` (limite), `130` (interruption).
-Les permissions persistées autorisent uniquement un programme et ses arguments
-exacts, pendant leur durée de validité.
-
-## Fonctions disponibles
-
-- Conversation terminal, streaming, interventions pendant le travail et reprise.
-- Exploration du projet, références `@fichier`, instructions `AGENTS.md` et skills.
-- Éditions journalisées, revue par blocs et annulation avec contrôle des conflits.
-- Plans, checkpoints, tâches, validations, permissions expirantes et planification cron.
-- Mémoire sémantique facultative, processus bornés et outils Git contrôlés.
-- API HTTP/WebSocket locale avec jeton Bearer ; recherche Web facultative via SearXNG.
-- Sauvegarde/restauration SQLite, export/suppression de sessions et purge explicite des audits.
-
-## Sécurité et données
-
-Le sandbox macOS refuse le réseau des processus et limite leurs accès aux fichiers.
-Les actions sensibles requièrent une approbation ou une permission exacte.
-L'API écoute sur `127.0.0.1` et ne doit pas être exposée à Internet.
-
-Le modèle peut modifier les fichiers du workspace ; une commande approuvée peut
-les supprimer. Le journal d'annulation ne couvre pas les effets des commandes ou
-de Git. `sandbox-exec` est un mécanisme Apple déprécié, sans audit de sécurité du
-projet contre du code hostile. Utilisez un workspace de confiance et conservez
-vos sauvegardes. Voir [SECURITY.md](SECURITY.md) et [le guide de sécurité](docs/security.md).
-
-Le stockage est `~/.local/share/gemma-agents`, ou `AGENT_STORAGE` explicite ;
-un ancien stockage adjacent au paquet reste reconnu. SQLite n'est pas chiffré.
-Les migrations préservent les données, sauvegardent avant mise à niveau et
-refusent les schémas futurs.
-
-```sh
-mkdir -p ~/Backups/gemma
-gemma-agents storage backup ~/Backups/gemma/avant-maj.db
-# Fermer toutes les instances utilisant ce stockage avant restauration.
-gemma-agents storage restore ~/Backups/gemma/avant-maj.db
-```
-
-Une sauvegarde SQLite ne contient ni les fichiers du projet, ni les skills, ni
-`config.toml`. Une restauration révoque les permissions enregistrées et conserve
-une copie de secours de la base remplacée. Voir [maintenance des données](docs/storage.md).
-
-## Documentation
-
-La documentation Sphinx comprend guides, configuration, commandes générées depuis
-Click, architecture et référence Python générée depuis les docstrings.
-
-| Besoin | Guide |
-| --- | --- |
-| Installer et démarrer | [Installation](docs/installation.md) |
-| Utiliser la conversation et la revue | [Terminal](docs/terminal.md) |
-| Mémoire, skills, tâches et cron | [Tâches](docs/tasks.md) |
-| Configurer les limites et services | [Configuration](docs/configuration.md) |
-| Intégrer un client local | [API HTTP/WebSocket](docs/api.md) |
-| Comprendre les protections | [Sécurité](docs/security.md) |
-| Sauvegarder, restaurer, supprimer | [Stockage](docs/storage.md) |
-| Comprendre et contribuer au code | [Architecture](docs/architecture.md), [développement](docs/development.md) |
-| Évaluer et livrer | [Évaluation](docs/evaluation.md), [release](docs/release.md) |
-| Résoudre un problème | [Dépannage](docs/troubleshooting.md) |
-
-```sh
-uv sync --locked --group docs
-uv run --locked --group docs sphinx-build -W --keep-going -b html docs docs/_build/html
-open docs/_build/html/index.html
-```
-
-La configuration [Read the Docs](.readthedocs.yaml) utilise uv et le groupe `docs`.
-L'activation du projet hébergé est expliquée dans le guide de release ; aucune URL
-publique n'est annoncée tant que le service n'a pas été raccordé.
-
-## Développement et validation
-
-```sh
-uv run --locked pytest -q
-uv run --locked ruff check src tests examples scripts docs/conf.py
-uv build
-uv run --locked scripts/smoke_wheel.py dist/gemma_agents-1.0.0-py3-none-any.whl
-uv run --locked examples/evaluate_release.py --model gemma4:12b-mlx \
-  --repetitions 3 --output /tmp/gemma-acceptance.json
-```
-
-Le nom `gemma4:12b-mlx` est celui du modèle de développement, pas une valeur imposée.
-Les tests déterministes n'utilisent pas de modèle. Les tests d'isolation s'exécutent
-réellement sur macOS ; la CI Linux vérifie seulement le code portable et les docs.
-Le banc réel mesure six scénarios répétés et conserve les échecs dans son rapport.
-
-Consultez [CONTRIBUTING.md](CONTRIBUTING.md), [le changelog](CHANGELOG.md) et
-[les références officielles](docs/sources.md).
-
-## Licence
-
-[Apache-2.0](LICENSE), choisie par le mainteneur. Les modèles et dépendances
-conservent leurs propres licences.
+Distribué sous licence [Apache-2.0](LICENSE). Les modèles et dépendances conservent
+leurs propres licences.
